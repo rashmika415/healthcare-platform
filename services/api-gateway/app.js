@@ -2,7 +2,7 @@ const express   = require('express');
 const mongoose  = require('mongoose');
 const cors      = require('cors');
 const helmet    = require('helmet');
-const { createProxyMiddleware } = require('http-proxy-middleware');
+const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 require('dotenv').config();
 
 const authRoutes     = require('./routes/authRoutes');
@@ -14,14 +14,13 @@ const PORT = process.env.PORT || 3000;
 // ── Global middleware ─────────────────────────────────
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+// Keep proxy routes before body parsing to avoid consumed request streams.
+// JSON parsing is enabled later for gateway-owned routes like /auth.
 
 // ── Public routes (no token needed) ──────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'api-gateway' });
 });
-
-app.use('/auth', authRoutes);
 
 // ── Protected routes (token required) ────────────────
 // authMiddleware runs first → if valid → proxy to service
@@ -29,9 +28,21 @@ app.use('/patients',
   authMiddleware,
   createProxyMiddleware({
     target: process.env.PATIENT_SERVICE_URL,
-    changeOrigin: true
+    changeOrigin: true,
+    onProxyReq: fixRequestBody,
+    pathRewrite: (path) => `/patients${path}`
+
   })
 );
+
+// Parse request body for routes that are handled inside gateway.
+app.use(express.json());
+
+app.use('/auth', authRoutes);
+// This means:
+// POST /auth/register → goes to authRoutes
+// POST /auth/login    → goes to authRoutes
+// GET  /auth/me       → goes to authRoutes
 
 
 // ── Connect MongoDB then start server ─────────────────
