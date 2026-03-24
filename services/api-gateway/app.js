@@ -2,7 +2,7 @@ const express   = require('express');
 const mongoose  = require('mongoose');
 const cors      = require('cors');
 const helmet    = require('helmet');
-const { createProxyMiddleware } = require('http-proxy-middleware');
+const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 require('dotenv').config();
 
 const authRoutes     = require('./routes/authRoutes');
@@ -22,6 +22,10 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/auth', authRoutes);
+// This means:
+// POST /auth/register → goes to authRoutes
+// POST /auth/login    → goes to authRoutes
+// GET  /auth/me       → goes to authRoutes
 
 // ── Protected routes (token required) ────────────────
 // authMiddleware runs first → if valid → proxy to service
@@ -29,7 +33,8 @@ app.use('/patients',
   authMiddleware,
   createProxyMiddleware({
     target: process.env.PATIENT_SERVICE_URL,
-    changeOrigin: true
+    changeOrigin: true,
+    onProxyReq: fixRequestBody
   })
 );
 
