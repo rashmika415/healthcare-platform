@@ -59,9 +59,17 @@ module.exports = {
         "on-tertiary-fixed": "#3c2f56"
       },
       fontFamily: {
-        "headline": ["Inter", "sans-serif"],
-        "body": ["Inter", "sans-serif"],
-        "label": ["Inter", "sans-serif"]
+        "headline": ["Sora", "sans-serif"],
+        "body": ["Manrope", "sans-serif"],
+        "label": ["Manrope", "sans-serif"]
+      },
+      boxShadow: {
+        "nexus-soft": "0 20px 52px -28px rgba(0, 24, 54, 0.5)",
+        "nexus-panel": "0 16px 42px -26px rgba(0, 24, 54, 0.45)",
+      },
+      backgroundImage: {
+        "nexus-mesh": "radial-gradient(circle at 82% 20%, rgba(59, 130, 246, 0.16), transparent 42%), radial-gradient(circle at 14% 72%, rgba(148, 163, 184, 0.16), transparent 45%)",
+        "nexus-cta": "radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.25), transparent 50%), radial-gradient(circle at 80% 100%, rgba(14, 165, 233, 0.2), transparent 55%)",
       },
       borderRadius: {
         "DEFAULT": "0.25rem",

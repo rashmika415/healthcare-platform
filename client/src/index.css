@@ -2,8 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* optional: import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
+
+body {
+  font-family: 'Manrope', sans-serif;
+}
+
+.font-headline {
+  font-family: 'Sora', sans-serif;
+}
 
 .reveal {
   opacity: 0;
@@ -13,6 +20,30 @@
 .reveal.visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.delay-1 {
+  transition-delay: 80ms;
+}
+
+.delay-2 {
+  transition-delay: 150ms;
+}
+
+.delay-3 {
+  transition-delay: 220ms;
+}
+
+.delay-4 {
+  transition-delay: 290ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .glass-nav {
@@ -32,4 +63,55 @@
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.menu-panel {
+  transform: translateX(100%);
+  transition: transform 260ms ease;
+}
+
+.menu-panel.open {
+  transform: translateX(0);
+}
+
+.hero-enter {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: heroRise 720ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+.hero-enter-1 {
+  animation-delay: 80ms;
+}
+
+.hero-enter-2 {
+  animation-delay: 170ms;
+}
+
+.hero-enter-3 {
+  animation-delay: 260ms;
+}
+
+.hero-enter-4 {
+  animation-delay: 350ms;
+}
+
+@keyframes heroRise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-enter {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
 }
