@@ -35,6 +35,16 @@ app.use('/patients',
   })
 );
 
+app.use('/doctor',
+  authMiddleware,
+  createProxyMiddleware({
+    target: process.env.DOCTOR_SERVICE_URL, // http://localhost:3002
+    changeOrigin: true,
+    onProxyReq: fixRequestBody,
+    pathRewrite: path => path // keep /profile path as-is
+  })
+);
+
 // Parse request body for routes that are handled inside gateway.
 app.use(express.json());
 
