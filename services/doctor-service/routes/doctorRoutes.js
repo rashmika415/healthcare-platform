@@ -19,4 +19,20 @@ router.post('/profile', authMiddleware, doctorController.upsertProfile);
 router.delete('/profile', authMiddleware, doctorController.deleteProfile);
 
 
+// ✅ VERIFY DOCTOR (ADMIN)
+router.patch('/verify/:doctorId', authMiddleware, doctorController.verifyDoctor);
+
+
+// ✅ GET UNVERIFIED DOCTORS (ADMIN)
+router.get('/unverified', authMiddleware, doctorController.getUnverifiedDoctors);
+
+
+// ✅ GET VERIFIED DOCTORS (ADMIN)
+router.get('/verified', authMiddleware, doctorController.getVerifiedDoctors);
+
+
+// ✅ GET DOCTOR BY ID (ADMIN)
+router.get('/:doctorId', authMiddleware, doctorController.getDoctorById);
+
+
 module.exports = router;
