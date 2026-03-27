@@ -70,6 +70,34 @@ app.use('/doctor',
     }
   })
 );
+
+app.use('/video',
+  authMiddleware,
+  createProxyMiddleware({
+    target: process.env.VIDEO_SERVICE_URL || 'http://localhost:3006',
+    changeOrigin: true,
+    pathRewrite: { '^/video': '' },
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.headers['x-user-id']) {
+          proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
+          proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
+          proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
+        }
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error:', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Video service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
 app.use('/auth', express.json({ limit: '50mb' }), authRoutes);
 // This means:
 // POST /auth/register → goes to authRoutes
