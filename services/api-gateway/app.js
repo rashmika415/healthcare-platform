@@ -2,9 +2,10 @@ const express   = require('express');
 const mongoose  = require('mongoose');
 const cors      = require('cors');
 const helmet    = require('helmet');
+
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 require('dotenv').config();
-
+const adminRoutes = require('./routes/adminRoutes');
 const authRoutes     = require('./routes/authRoutes');
 const authMiddleware = require('./middleware/authMiddleware');
 
@@ -33,7 +34,8 @@ app.use('/patients',
   createProxyMiddleware({
     target: process.env.PATIENT_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: (path) => path.replace(/^\/patients/, ''),
+    // Preserve /patients prefix because patient-service mounts routes at /patients
+    pathRewrite: (path) => `/patients${path}`,
     on: {
       proxyReq: (proxyReq, req, res) => {
         fixRequestBody(proxyReq, req, res);
@@ -71,6 +73,7 @@ app.use('/doctor',
   })
 );
 
+
 app.use('/video',
   authMiddleware,
   createProxyMiddleware({
@@ -98,7 +101,17 @@ app.use('/video',
     }
   })
 );
-app.use('/auth', express.json({ limit: '50mb' }), authRoutes);
+
+
+// Parse request body for routes that are handled inside gateway.
+app.use(express.json());
+
+app.use('/auth', authRoutes);
+app.use('/admin', adminRoutes);
+
+
+
+
 // This means:
 // POST /auth/register → goes to authRoutes
 // POST /auth/login    → goes to authRoutes

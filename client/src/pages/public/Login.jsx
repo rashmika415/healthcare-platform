@@ -6,7 +6,7 @@ const NexusLogin = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ email: '', password: '', remember: true });
+  const [form, setForm] = useState({ email: '', password: '', remember: false });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +31,7 @@ const NexusLogin = () => {
     setLoading(true);
 
     try {
-      const user = await login(form.email, form.password);
+      const user = await login(form.email, form.password, form.remember);
       navigate(getRedirectPathByRole(user?.role));
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
