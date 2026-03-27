@@ -8,6 +8,10 @@ import LandingPage  from './pages/public/LandingPage';
 import Login        from './pages/public/Login';
 import Register     from './pages/public/Register';
 
+import AdminDashboard    from './pages/admin/AdminDashboard';
+import AdminDoctors      from './pages/admin/AdminDoctors';
+import AdminPatients     from './pages/admin/AdminPatients';
+
 // // Patient pages
 import PatientSetup         from './pages/patient/Patientsetupandprofile';
 import { PatientProfile }   from './pages/patient/Patientsetupandprofile';
@@ -32,6 +36,24 @@ export default function App() {
           <Route path="/"         element={<LandingPage />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
+
+<Route path="/admin/dashboard" element={
+  <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
+} />
+<Route path="/admin/doctors" element={
+  <PrivateRoute role="admin"><AdminDoctors /></PrivateRoute>
+} />
+<Route path="/admin/patients" element={
+  <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
+} /><Route path="/admin/dashboard" element={
+  <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
+} />
+<Route path="/admin/doctors" element={
+  <PrivateRoute role="admin"><AdminDoctors /></PrivateRoute>
+} />
+<Route path="/admin/patients" element={
+  <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
+} />
 
           ── Patient ────────────────────────────
           {/* ── Patient routes ── */}
