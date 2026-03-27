@@ -34,7 +34,8 @@ app.use('/patients',
   createProxyMiddleware({
     target: process.env.PATIENT_SERVICE_URL,
     changeOrigin: true,
-    pathRewrite: (path) => path.replace(/^\/patients/, ''),
+    // Preserve /patients prefix because patient-service mounts routes at /patients
+    pathRewrite: (path) => `/patients${path}`,
     on: {
       proxyReq: (proxyReq, req, res) => {
         fixRequestBody(proxyReq, req, res);
