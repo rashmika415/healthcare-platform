@@ -29,6 +29,33 @@ app.get('/health', (req, res) => {
 
 // ── Protected routes (token required) ────────────────
 // authMiddleware runs first → if valid → proxy to service
+
+// ── Public doctor availability (no token) ────────────
+// Used by patients / appointment service to view a doctor's active slots
+app.use('/doctor/availability',
+  createProxyMiddleware({
+    target: process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002',
+    changeOrigin: true,
+    // Express strips the mount path (/doctor/availability) from req.url,
+    // so here `path` is like "/:doctorId". We need to forward it as
+    // "/availability/:doctorId" to the doctor-service.
+    pathRewrite: (path) => `/availability${path}`,
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error:', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Doctor service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
 app.use('/patients',
   authMiddleware,
   createProxyMiddleware({
