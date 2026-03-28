@@ -30,15 +30,48 @@ app.get('/health', (req, res) => {
 // ── Protected routes (token required) ────────────────
 // authMiddleware runs first → if valid → proxy to service
 
-// ── Public doctor availability (no token) ────────────
+// ── Authenticated doctor availability for logged-in doctor
+// GET /doctor/availability/me -> /availability/me (requires login)
+app.use('/doctor/availability/me',
+  authMiddleware,
+  createProxyMiddleware({
+    target: process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002',
+    changeOrigin: true,
+    pathRewrite: (path) => `/availability/me`,
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.headers['x-user-id']) {
+          proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
+          proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
+          proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
+          const verified = req.headers['x-user-verified'];
+          if (verified !== undefined && verified !== null) {
+            proxyReq.setHeader('x-user-verified', verified);
+          }
+        }
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error:', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Doctor service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
+// ── Public doctor availability (no token)
 // Used by patients / appointment service to view a doctor's active slots
 app.use('/doctor/availability',
   createProxyMiddleware({
     target: process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002',
     changeOrigin: true,
     // Express strips the mount path (/doctor/availability) from req.url,
-    // so here `path` is like "/:doctorId". We need to forward it as
-    // "/availability/:doctorId" to the doctor-service.
+    // so here `path` is like "/?day=Monday" or "/:doctorId" etc.
     pathRewrite: (path) => `/availability${path}`,
     proxyTimeout: 15000,
     timeout: 15000,

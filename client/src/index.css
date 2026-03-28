@@ -115,3 +115,18 @@ body {
     animation: none;
   }
 }
+
+.input {
+  @apply border p-2 w-full mb-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.react-calendar {
+  border: none !important;
+  width: 100% !important;
+}
+
+.react-calendar__tile--active {
+  background: #2563eb !important;
+  color: white !important;
+  border-radius: 10px;
+}

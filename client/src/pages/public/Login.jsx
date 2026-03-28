@@ -20,7 +20,7 @@ const NexusLogin = () => {
 
   const getRedirectPathByRole = (role) => {
     if (role === 'patient') return '/patient/dashboard';
-    if (role === 'doctor') return '/';
+    if (role === 'doctor') return '/doctor/dashboard';
     if (role === 'admin') return '/admin/dashboard';
     return '/';
   };
