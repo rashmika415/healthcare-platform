@@ -1,3 +1,4 @@
+// patientModel.js
 const mongoose = require('mongoose');
 
 // ── Sub-schema: Prescription ──────────────────────────

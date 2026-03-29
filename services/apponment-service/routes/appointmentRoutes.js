@@ -1,4 +1,4 @@
-// appoinmentRoute.js
+// appointmentRoutes.js
 const express = require('express');
 const router = express.Router();
 
@@ -10,7 +10,10 @@ const appointmentController = require("../Controller/appointmentController");
 
 router.get("/getallappointments", appointmentController.getallappointments);
 router.post("/createappointment", appointmentController.createappointment);
+router.get("/getappointmentbyid/:id", appointmentController.getappointmentbyid);
 router.put("/updateappointment/:id", appointmentController.updateappointment);
 router.delete("/deleteappointment/:id", appointmentController.deleteappointment);
 
 module.exports = router;
+
+

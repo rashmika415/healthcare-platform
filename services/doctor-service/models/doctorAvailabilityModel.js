@@ -1,3 +1,4 @@
+// doctorAvailabilityModel.js
 const mongoose = require('mongoose');
 
 const doctorAvailabilitySchema = new mongoose.Schema(

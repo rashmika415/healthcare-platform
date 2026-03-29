@@ -1,3 +1,4 @@
+//services/apponment-service/Controller/appointmentController.js
 const Appointment = require("../module/appintmentModule");
 
 // Get all appointments
@@ -45,6 +46,23 @@ const createappointment = async (req, res) => {
     return res.status(201).json({ appointment });
 };
 
+//Get appointment by id
+const getappointmentbyid = async (req, res) => {
+    const id = req.params.id;
+    let appointment;
+    try {
+        appointment = await Appointment.findById(id);
+    }
+    catch (error) {
+        console.log(error);
+    }   
+    if (!appointment) {
+        return res.status(404).json({ message: "No appointment found" });
+    }
+    return res.status(200).json({ appointment });
+};
+
+
 //update appointment
 const updateappointment = async (req, res) => {
     const id = req.params.id;
@@ -91,3 +109,4 @@ exports.getallappointments = getallappointments;
 exports.createappointment = createappointment;
 exports.updateappointment = updateappointment;
 exports.deleteappointment = deleteappointment;
+exports.getappointmentbyid = getappointmentbyid;
