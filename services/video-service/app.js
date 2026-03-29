@@ -2,9 +2,14 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 require('dotenv').config();
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3006;
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Connected to MongoDB successfully for Video Service'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 app.use(helmet());
 app.use(cors());
