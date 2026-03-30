@@ -65,29 +65,35 @@ app.use('/doctor/availability/me',
 );
 
 // ── Public doctor availability (no token)
-// Used by patients / appointment service to view a doctor's active slots
-app.use('/doctor/availability',
-  createProxyMiddleware({
-    target: process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002',
-    changeOrigin: true,
-    // Express strips the mount path (/doctor/availability) from req.url,
-    // so here `path` is like "/?day=Monday" or "/:doctorId" etc.
-    pathRewrite: (path) => `/availability${path}`,
-    proxyTimeout: 15000,
-    timeout: 15000,
-    on: {
-      proxyReq: (proxyReq, req, res) => {
-        fixRequestBody(proxyReq, req, res);
-      },
-      error: (err, req, res) => {
-        console.error('Proxy error:', err);
-        if (!res.headersSent) {
-          res.status(503).json({ error: 'Doctor service unavailable', details: err.message });
-        }
+// Used by patients / appointment service to view a doctor's active slots.
+// Important: Doctors also use `/doctor/availability` for POST.
+// We restrict this public proxy to GET requests only; other methods will fall through
+// to the authenticated `/doctor` proxy below.
+const publicDoctorAvailabilityProxy = createProxyMiddleware({
+  target: process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002',
+  changeOrigin: true,
+  // Express strips the mount path (/doctor/availability) from req.url,
+  // so here `path` is like "/?day=Monday" or "/:doctorId" etc.
+  pathRewrite: (path) => `/availability${path}`,
+  proxyTimeout: 15000,
+  timeout: 15000,
+  on: {
+    proxyReq: (proxyReq, req, res) => {
+      fixRequestBody(proxyReq, req, res);
+    },
+    error: (err, req, res) => {
+      console.error('Proxy error:', err);
+      if (!res.headersSent) {
+        res.status(503).json({ error: 'Doctor service unavailable', details: err.message });
       }
     }
-  })
-);
+  }
+});
+
+app.use('/doctor/availability', (req, res, next) => {
+  if (req.method !== 'GET') return next(); // allow authenticated proxy to handle POST/PUT/PATCH/DELETE
+  return publicDoctorAvailabilityProxy(req, res, next);
+});
 
 app.use('/patients',
   authMiddleware,

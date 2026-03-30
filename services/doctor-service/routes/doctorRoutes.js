@@ -2,6 +2,7 @@
 
 const router = require('express').Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const role = require('../middleware/roleMiddleware');
 
 // Import controller
 const doctorController = require('../controllers/doctorController');
