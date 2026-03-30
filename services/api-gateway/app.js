@@ -139,7 +139,9 @@ app.use('/video',
   createProxyMiddleware({
     target: process.env.VIDEO_SERVICE_URL || 'http://localhost:3006',
     changeOrigin: true,
-    pathRewrite: { '^/video': '' },
+    // Express strips the mount path (/video) from req.url, but video-service
+    // mounts routes at /video. Re-add the prefix so /video/sessions/* matches.
+    pathRewrite: (path) => `/video${path}`,
     proxyTimeout: 15000,
     timeout: 15000,
     on: {

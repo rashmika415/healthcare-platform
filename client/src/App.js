@@ -29,6 +29,7 @@ import Reports from "./pages/doctor/Reports";
 import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
 import Profile from "./pages/doctor/Profile";
 import Availability from "./pages/doctor/Availability";
+import VideoServiceTest from './pages/video/VideoServiceTest';
 
 // // Admin pages
 // import AdminDashboard from './pages/admin/AdminDashboard';
@@ -111,6 +112,9 @@ export default function App() {
           <Route path="/doctor/availability" element={
             <PrivateRoute role="doctor"><Availability /></PrivateRoute>
           } />
+
+          {/* Video Service standalone test page (your part) */}
+          <Route path="/video-test" element={<VideoServiceTest />} />
           
 
           {/* ── Admin ──────────────────────────────
