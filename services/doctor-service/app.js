@@ -28,6 +28,7 @@ app.use((req, res, next) => {
 // Import routes
 const doctorRoutes = require('./routes/doctorRoutes');
 const doctorAvailabilityRoutes = require('./routes/doctorAvailabilityRoutes');
+const prescriptionRoutes       = require('./routes/prescriptionRoutes');
 
 // ── Mongoose configuration ─────────────────────────
 mongoose.set('strictQuery', true);
@@ -56,6 +57,8 @@ app.get('/', (req, res) => {
 // Gateway: /doctor/profile → Service: /profile
 app.use('/', doctorAvailabilityRoutes);
 app.use('/', doctorRoutes);
+app.use('/prescriptions', prescriptionRoutes);
+
 
 // DB health check
 app.get('/db-health', (req, res) => {
