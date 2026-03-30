@@ -27,7 +27,8 @@ const RegistrationPage = () => {
 
   const getRedirectPathByRole = (role) => {
     if (role === 'patient') return '/patient/setup';
-    if (role === 'doctor') return '/';
+    // Send doctors straight to the professional details form
+    if (role === 'doctor') return '/doctor/profile';
     if (role === 'admin') return '/admin/dashboard';
     return '/';
   };

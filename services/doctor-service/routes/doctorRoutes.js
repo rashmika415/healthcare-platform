@@ -23,6 +23,10 @@ router.delete('/profile', authMiddleware, doctorController.deleteProfile);
 // ✅ VERIFY DOCTOR (ADMIN)
 router.patch('/verify/:doctorId', authMiddleware, doctorController.verifyDoctor);
 
+// ✅ VERIFY DOCTOR PROFILE BY USER ID (ADMIN)
+// API gateway verifies users by User._id, but doctor profile uses Doctor.userId.
+router.patch('/verify-by-user/:userId', authMiddleware, doctorController.verifyDoctorByUserId);
+
 
 // ✅ GET UNVERIFIED DOCTORS (ADMIN)
 router.get('/unverified', authMiddleware, doctorController.getUnverifiedDoctors);
