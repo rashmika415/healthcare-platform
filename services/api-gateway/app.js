@@ -110,6 +110,79 @@ app.use('/patients',
   })
 );
 
+// ── Appointments (doctor) ─────────────────────────────
+// Frontend calls:
+// - GET    /doctor/appointments
+// - PATCH  /doctor/appointments/:id
+// Appointment service mounts at /appointments, so we prefix `/appointments` here.
+app.use('/doctor/appointments',
+  authMiddleware,
+  createProxyMiddleware({
+    target: process.env.APPOINTMENT_SERVICE_URL || 'http://localhost:3003',
+    changeOrigin: true,
+    pathRewrite: (path) => {
+      // Express strips the mount path (/doctor/appointments) from req.url.
+      // So `path` can be '' or '/:id' etc.
+      if (!path || path === '/') return `/appointments/doctor/appointments`;
+      return `/appointments/doctor/appointments${path}`;
+    },
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.headers['x-user-id']) {
+          proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
+          proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
+          proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
+        }
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error:', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Appointment service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
+// ── Appointments (patient + doctor dashboard) ─────────
+// Frontend calls:
+// - GET    /appointments
+// - GET    /appointments/patient
+// - DELETE /appointments/:id
+app.use('/appointments',
+  authMiddleware,
+  createProxyMiddleware({
+    target: process.env.APPOINTMENT_SERVICE_URL || 'http://localhost:3003',
+    changeOrigin: true,
+    // Appointment service mounts at /appointments. Express strips the mount path
+    // (/appointments) before proxying, so we add it back here.
+    pathRewrite: (path) => `/appointments${path}`,
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.headers['x-user-id']) {
+          proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
+          proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
+          proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
+        }
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error:', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Appointment service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
 app.use('/doctor',
   authMiddleware,
   createProxyMiddleware({

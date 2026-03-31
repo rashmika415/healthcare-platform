@@ -27,9 +27,10 @@ export default function DoctorAppointments() {
 
   const handleAction = async (id, status) => {
     try {
-      await api.patch(`/doctor/appointments/${id}`, { status });
+      const { data } = await api.patch(`/doctor/appointments/${id}`, { status });
+      const updated = data?.appointment;
       setAppointments(prev =>
-        prev.map(a => a._id === id ? { ...a, status } : a)
+        prev.map(a => (a._id === id ? { ...a, ...(updated || { status }) } : a))
       );
     } catch {
       setError("Action failed");
@@ -153,15 +154,27 @@ export default function DoctorAppointments() {
 
                 {/* Add Prescription for accepted */}
                 {ap.status === "accepted" && (
-                  <button
-                    onClick={() => {
-                      setSelectedPatient(ap.patientUserId);
-                      setShowModal(true);
-                    }}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Add Prescription
-                  </button>
+                  <div className="flex gap-2">
+                    {ap.videoRoomLink && (
+                      <a
+                        href={ap.videoRoomLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-1 text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100 border border-green-200"
+                      >
+                        Join Video →
+                      </a>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedPatient(ap.patientUserId);
+                        setShowModal(true);
+                      }}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Add Prescription
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

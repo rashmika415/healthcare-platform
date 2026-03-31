@@ -1,6 +1,8 @@
 // app.js
 // Load environment variables
-require("dotenv").config();
+// This service's .env currently lives under routes/.env in this repo.
+// Load it explicitly so MongoDB connection works when starting from app.js.
+require("dotenv").config({ path: __dirname + "/routes/.env" });
 
 const express = require("express");
 const mongoose = require("mongoose");
