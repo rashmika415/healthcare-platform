@@ -22,6 +22,14 @@ import { PatientHistory }   from './pages/patient/Patientprescriptionsandhistory
 //import PatientAppointments  from './pages/patient/PatientAppointments';
 
 
+// // Doctor pages
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import Appointments from "./pages/doctor/Appointments";
+import Reports from "./pages/doctor/Reports";
+import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
+import Profile from "./pages/doctor/Profile";
+import Availability from "./pages/doctor/Availability";
+import VideoServiceTest from './pages/video/VideoServiceTest';
 
 // // Admin pages
 // import AdminDashboard from './pages/admin/AdminDashboard';
@@ -85,6 +93,28 @@ export default function App() {
   <PrivateRoute role="patient"><PatientAppointments /></PrivateRoute>
 } /> */}
 
+  {/* Doctor ✅ FIXED */}
+          <Route path="/doctor/dashboard" element={
+            <PrivateRoute role="doctor"><DoctorDashboard /></PrivateRoute>
+          } />
+          <Route path="/doctor/appointments" element={
+            <PrivateRoute role="doctor"><Appointments /></PrivateRoute>
+          } />
+          <Route path="/doctor/reports" element={
+            <PrivateRoute role="doctor"><Reports /></PrivateRoute>
+          } />
+          <Route path="/doctor/prescriptions" element={
+            <PrivateRoute role="doctor"><DoctorPrescriptions /></PrivateRoute>
+          } />
+          <Route path="/doctor/profile" element={
+            <PrivateRoute role="doctor"><Profile /></PrivateRoute>
+          } />
+          <Route path="/doctor/availability" element={
+            <PrivateRoute role="doctor"><Availability /></PrivateRoute>
+          } />
+
+          {/* Video Service standalone test page (your part) */}
+          <Route path="/video-test" element={<VideoServiceTest />} />
           
 
           {/* ── Admin ──────────────────────────────

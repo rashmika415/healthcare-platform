@@ -55,6 +55,35 @@ router.put('/verify-doctor/:id', async (req, res) => {
     user.isVerified = true;
     await user.save();
 
+    // Notify doctor-service to mark doctor profile verified and email the doctor.
+    // Doctor-service updates Doctor.isVerified and sends email.
+    try {
+      const doctorServiceUrl = process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002';
+      const adminId = req.headers['x-user-id'];
+      const adminRole = req.headers['x-user-role'];
+
+      const verifyRes = await fetch(`${doctorServiceUrl}/verify-by-user/${user._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          // doctor-service authMiddleware expects these headers
+          'x-user-id': adminId,
+          'x-user-role': adminRole,
+          // Fallback for email/notification if doctor profile isn't created yet
+          'x-doctor-email': user.email,
+          'x-doctor-name': user.name
+        }
+      });
+
+      if (!verifyRes.ok) {
+        const body = await verifyRes.json().catch(() => ({}));
+        // Non-fatal: user is already verified in gateway; email might fail if doctor profile not found.
+        console.warn('Doctor-service verify-by-user failed:', verifyRes.status, body?.error || body?.message);
+      }
+    } catch (e) {
+      console.warn('Doctor-service call failed:', e.message);
+    }
+
     res.json({ message: 'Doctor verified successfully', user });
   } catch (err) {
     res.status(500).json({ error: err.message });
