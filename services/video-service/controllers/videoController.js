@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const VideoSession = require('../models/VideoSession');
+const { sendSessionCreatedEmails } = require('../utils/mailer');
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
@@ -15,7 +16,17 @@ function canCreateSession(role) {
 exports.createSession = async (req, res) => {
   try {
     const { role, id: requesterId } = req.user;
-    const { appointmentId, patientUserId, doctorUserId } = req.body || {};
+    const {
+      appointmentId,
+      patientUserId,
+      doctorUserId,
+      // Optional email notification fields (used by your team integration)
+      patientEmail,
+      doctorEmail,
+      patientName,
+      doctorName,
+      scheduledAt,
+    } = req.body || {};
 
     if (!canCreateSession(role)) {
       return res.status(403).json({ error: 'Only patients or doctors can create sessions' });
@@ -53,6 +64,30 @@ exports.createSession = async (req, res) => {
       expiresAt
     });
 
+    // Build meeting URL (same format as join endpoint) so we can email it immediately.
+    const baseUrl = process.env.JITSI_BASE_URL || 'https://meet.jit.si';
+    const displayName = encodeURIComponent(req.user.name || role || 'Participant');
+    const meetingUrl = `${baseUrl}/${roomName}#userInfo.displayName="${displayName}"`;
+
+    // Send email notifications if emails were provided.
+    // IMPORTANT: email failure should NOT fail session creation.
+    let emailNotification = null;
+    try {
+      if (patientEmail || doctorEmail) {
+        emailNotification = await sendSessionCreatedEmails({
+          doctorEmail,
+          patientEmail,
+          doctorName,
+          patientName,
+          appointmentId,
+          meetingUrl,
+          scheduledAt,
+        });
+      }
+    } catch (e) {
+      emailNotification = { skipped: false, error: e?.message || 'Email send failed' };
+    }
+
     return res.status(201).json({
       message: 'Video consultation session created',
       session: {
@@ -64,7 +99,12 @@ exports.createSession = async (req, res) => {
       join: {
         endpoint: `/video/sessions/${sessionId}/join`,
         participantToken
-      }
+      },
+      meeting: {
+        provider: 'jitsi',
+        url: meetingUrl
+      },
+      email: emailNotification
     });
 
   } catch (error) {
