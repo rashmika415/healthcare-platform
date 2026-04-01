@@ -1,22 +1,40 @@
 //services/apponment-service/Controller/appointmentController.js
 const Appointment = require("../module/appintmentModule");
+const axios = require("axios");
 
 // Get all appointments
 const getallappointments = async (req, res) => {
-    let appointments;
-    //get all appointments
     try {
-        appointments = await Appointment.find();
-        
-    }
-    catch (error) {
-        console.log(error);
-    }   
-    if (!appointments) {
-        return res.status(404).json({ message: "No appointments found" });
-    }
-    return res.status(200).json({ appointments });
+        const appointments = await Appointment.find();
 
+        //  LOOP + FETCH DATA
+        const enrichedAppointments = await Promise.all(
+            appointments.map(async (appt) => {
+
+                // CALL Patient Service
+                const patientRes = await axios.get(
+                    `http://localhost:3001/patients/${appt.patientId}`
+                );
+
+                // CALL Doctor Service
+                const doctorRes = await axios.get(
+                    `http://localhost:3n002/doctors/${appt.doctorId}`
+                );
+
+                return {
+                    ...appt.toObject(),
+                    patient: patientRes.data,
+                    doctor: doctorRes.data
+                };
+            })
+        );
+
+        return res.status(200).json({ appointments: enrichedAppointments });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ message: "Error fetching appointments" });
+    }
 };
 
 
