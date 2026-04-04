@@ -21,7 +21,7 @@ import PatientDashboard     from './pages/patient/PatientDashboard';
 import PatientReports       from './pages/patient/Patientreports';
 import PatientPrescriptions from './pages/patient/Patientprescriptionsandhistory';
 import { PatientHistory }   from './pages/patient/Patientprescriptionsandhistory';
-//import PatientAppointments  from './pages/patient/PatientAppointments';
+import PatientAppointments  from './pages/patient/Patientappointments';
 
 
 // // Doctor pages
@@ -93,9 +93,9 @@ export default function App() {
   <PrivateRoute role="patient"><PatientHistory /></PrivateRoute>
 } />
 
-{/* <Route path="/patient/appointments" element={
+<Route path="/patient/appointments" element={
   <PrivateRoute role="patient"><PatientAppointments /></PrivateRoute>
-} /> */}
+} />
 
   {/* Doctor ✅ FIXED */}
           <Route path="/doctor/dashboard" element={

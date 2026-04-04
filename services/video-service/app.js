@@ -1,7 +1,8 @@
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
-require('dotenv').config();
+// Always load the correct .env for this service (independent of cwd).
+require('dotenv').config({ path: __dirname + '/.env' });
 const mongoose = require('mongoose');
 
 const app = express();

@@ -5,7 +5,7 @@ import PatientLayout from './Patientlayout ';
 
 const STATUS_STYLES = {
   pending:   { bg: '#fff7ed', color: '#c05621', label: 'Pending' },
-  confirmed: { bg: '#f0fdf4', color: '#16a34a', label: 'Confirmed' },
+  accepted:  { bg: '#f0fdf4', color: '#16a34a', label: 'Confirmed' },
   completed: { bg: '#f0f7ff', color: '#1a56db', label: 'Completed' },
   cancelled: { bg: '#fff5f5', color: '#e53e3e', label: 'Cancelled' },
 };
@@ -49,7 +49,7 @@ export default function PatientAppointments() {
 
       {/* Filter tabs */}
       <div style={s.tabs}>
-        {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(f => (
+        {['all', 'pending', 'accepted', 'completed', 'cancelled'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ ...s.tab, ...(filter === f ? s.tabActive : {}) }}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -97,14 +97,14 @@ export default function PatientAppointments() {
                   </span>
 
                   <div style={s.actions}>
-                    {/* Video join button — only if confirmed and has room link */}
-                    {ap.status === 'confirmed' && ap.videoRoomLink && (
+                    {/* Video join button — only if accepted and backend generated a room link */}
+                    {ap.status === 'accepted' && ap.videoRoomLink && (
                       <a href={ap.videoRoomLink} target="_blank" rel="noreferrer" style={s.joinBtn}>
                         Join Video →
                       </a>
                     )}
-                    {/* Cancel button — only for pending/confirmed */}
-                    {(ap.status === 'pending' || ap.status === 'confirmed') && (
+                    {/* Cancel button — only for pending/accepted */}
+                    {(ap.status === 'pending' || ap.status === 'accepted') && (
                       <button onClick={() => handleCancel(ap._id)} style={s.cancelBtn}>
                         Cancel
                       </button>
