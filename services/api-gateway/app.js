@@ -95,6 +95,32 @@ app.use('/doctor/availability', (req, res, next) => {
   return publicDoctorAvailabilityProxy(req, res, next);
 });
 
+// ── Public doctor search (no token)
+// Used by patients to search for doctors by name, specialization, hospital, date
+const publicDoctorSearchProxy = createProxyMiddleware({
+  target: process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002',
+  changeOrigin: true,
+  pathRewrite: (path) => `/search${path}`,
+  proxyTimeout: 15000,
+  timeout: 15000,
+  on: {
+    proxyReq: (proxyReq, req, res) => {
+      fixRequestBody(proxyReq, req, res);
+    },
+    error: (err, req, res) => {
+      console.error('Proxy error:', err);
+      if (!res.headersSent) {
+        res.status(503).json({ error: 'Doctor service unavailable', details: err.message });
+      }
+    }
+  }
+});
+
+app.use('/doctor/search', (req, res, next) => {
+  if (req.method !== 'GET') return next(); // only allow GET requests
+  return publicDoctorSearchProxy(req, res, next);
+});
+
 app.use('/patients',
   authMiddleware,
   createProxyMiddleware({
@@ -138,7 +164,6 @@ app.use('/doctor',
     }
   })
 );
-
 
 app.use('/video',
   authMiddleware,

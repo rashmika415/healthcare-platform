@@ -1,8 +1,179 @@
 const Doctor = require('../models/doctorModels');
+const DoctorAvailability = require('../models/doctorAvailabilityModel');
 
 // ✅ NEW: import helpers (make sure you create these files)
 const Notification = require('../models/Notification');
 const sendEmail = require('../utils/sendEmail');
+
+/**
+ * 🔹 PUBLIC: Search Doctors
+ * GET /doctor/search
+ * Query params: name, specialization, hospital, date
+ */
+exports.searchDoctors = async (req, res) => {
+  try {
+    const { name, specialization, hospital, date } = req.query;
+    
+    // Build search filter for verified doctors only
+    let filter = { isVerified: true };
+    
+    if (name) {
+      filter.name = { $regex: name, $options: 'i' };
+    }
+    
+    if (specialization) {
+      filter.specialization = { $regex: specialization, $options: 'i' };
+    }
+    
+    if (hospital) {
+      filter.hospital = { $regex: hospital, $options: 'i' };
+    }
+    
+    // Find doctors matching the criteria
+    const doctors = await Doctor.find(filter)
+      .select('name email specialization experience hospital bio isVerified')
+      .lean();
+    
+    // Get availability for each doctor if date is provided
+    let doctorsWithAvailability = doctors;
+    
+    if (date && doctors.length > 0) {
+      const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' });
+      
+      doctorsWithAvailability = await Promise.all(
+        doctors.map(async (doctor) => {
+          try {
+            // Get real availability data from database
+            const availability = await DoctorAvailability.find({
+              doctorUserId: doctor.userId,
+              isActive: true
+            }).sort({ day: 1, startTime: 1 });
+            
+            console.log('Found availability for doctor', doctor.name, ':', availability.length, 'slots');
+            
+            // Create sessions based on real availability data
+            const sessions = [];
+            
+            if (availability.length > 0) {
+              // Group availability by day
+              const availabilityByDay = {};
+              availability.forEach(slot => {
+                if (!availabilityByDay[slot.day]) {
+                  availabilityByDay[slot.day] = [];
+                }
+                availabilityByDay[slot.day].push(slot);
+              });
+              
+              // Generate sessions for the next 30 days
+              for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
+                const sessionDate = new Date(date);
+                sessionDate.setDate(sessionDate.getDate() + dayOffset);
+                const dateStr = sessionDate.toISOString().split('T')[0];
+                const dayOfWeek = sessionDate.toLocaleDateString('en-US', { weekday: 'long' });
+                
+                // Check if doctor has availability on this day
+                if (availabilityByDay[dayOfWeek]) {
+                  availabilityByDay[dayOfWeek].forEach(slot => {
+                    // Convert 24-hour time to 12-hour format
+                    const [hours, minutes] = slot.startTime.split(':');
+                    const hour12 = parseInt(hours) > 12 ? parseInt(hours) - 12 : parseInt(hours);
+                    const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+                    const time12 = `${hour12.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+                    
+                    // Always make sessions available for testing
+                    const isAvailable = true; // Math.random() > 0.2; // 80% chance of being available
+                    
+                    if (isAvailable) {
+                      sessions.push({
+                        date: dateStr,
+                        time: time12,
+                        patients: Math.floor(Math.random() * 10) + 1, // Random patients count
+                        fee: Math.floor(Math.random() * 2000) + 3000, // Fee between 3000-5000
+                        available: true
+                      });
+                    }
+                  });
+                }
+              }
+            } else {
+              // No availability found, create some default sessions for testing
+              console.log('No availability found, creating default sessions');
+              for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+                const sessionDate = new Date(date);
+                sessionDate.setDate(sessionDate.getDate() + dayOffset);
+                const dateStr = sessionDate.toISOString().split('T')[0];
+                
+                const timeSlots = ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM'];
+                timeSlots.forEach(time => {
+                  sessions.push({
+                    date: dateStr,
+                    time: time,
+                    patients: Math.floor(Math.random() * 10) + 1,
+                    fee: Math.floor(Math.random() * 2000) + 3000,
+                    available: true
+                  });
+                });
+              }
+            }
+            
+            console.log('Final sessions array:', sessions.length, 'sessions');
+            console.log('First session:', sessions[0]);
+            
+            return {
+              ...doctor,
+              hospitals: [{
+                name: doctor.hospital,
+                location: doctor.hospital.includes('Hospital') ? doctor.hospital : `${doctor.hospital}, Colombo`,
+                sessions: sessions
+              }],
+              gender: doctor.name.startsWith('Dr. ') ? 'Male' : 'Female', // Mock gender
+              rating: (4.5 + Math.random() * 0.5).toFixed(1), // Mock rating 4.5-5.0
+              experience: `${doctor.experience}+ years`,
+              avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70) + 1}` // Mock avatar
+            };
+          } catch (error) {
+            console.error('Error getting availability for doctor:', doctor.userId, error);
+            return {
+              ...doctor,
+              hospitals: [{
+                name: doctor.hospital,
+                location: doctor.hospital.includes('Hospital') ? doctor.hospital : `${doctor.hospital}, Colombo`,
+                sessions: []
+              }],
+              gender: doctor.name.startsWith('Dr. ') ? 'Male' : 'Female',
+              rating: (4.5 + Math.random() * 0.5).toFixed(1),
+              experience: `${doctor.experience}+ years`,
+              avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70) + 1}`
+            };
+          }
+        })
+      );
+    } else {
+      // No date provided, just return basic doctor info
+      doctorsWithAvailability = doctors.map(doctor => ({
+        ...doctor,
+        hospitals: [{
+          name: doctor.hospital,
+          location: doctor.hospital.includes('Hospital') ? doctor.hospital : `${doctor.hospital}, Colombo`,
+          sessions: []
+        }],
+        gender: doctor.name.startsWith('Dr. ') ? 'Male' : 'Female',
+        rating: (4.5 + Math.random() * 0.5).toFixed(1),
+        experience: `${doctor.experience}+ years`,
+        avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70) + 1}`
+      }));
+    }
+    
+    res.status(200).json({
+      doctors: doctorsWithAvailability,
+      count: doctorsWithAvailability.length
+    });
+    
+  } catch (err) {
+    console.error('Error in searchDoctors:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
 
 /**
  * Create or update Doctor profile

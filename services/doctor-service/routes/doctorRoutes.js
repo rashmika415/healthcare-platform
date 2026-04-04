@@ -7,6 +7,8 @@ const role = require('../middleware/roleMiddleware');
 // Import controller
 const doctorController = require('../controllers/doctorController');
 
+// 🔹 PUBLIC SEARCH ENDPOINTS (no auth required)
+router.get('/search', doctorController.searchDoctors);
 
 // 🔹 GET Doctor Profile
 router.get('/profile', authMiddleware, doctorController.getProfile);
@@ -38,6 +40,5 @@ router.get('/verified', authMiddleware, doctorController.getVerifiedDoctors);
 
 // ✅ GET DOCTOR BY ID (ADMIN)
 router.get('/:doctorId', authMiddleware, doctorController.getDoctorById);
-
 
 module.exports = router;

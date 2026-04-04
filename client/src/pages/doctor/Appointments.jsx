@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
 import PrescriptionForm from "../../components/doctor/PrescriptionForm";
+import { Calendar, Clock, Plus, User, Stethoscope } from "lucide-react";
 
 const STATUS_STYLES = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -10,6 +11,7 @@ const STATUS_STYLES = {
 
 export default function DoctorAppointments() {
   const [appointments, setAppointments] = useState([]);
+  const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
@@ -17,13 +19,71 @@ export default function DoctorAppointments() {
   // New states for modal
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  
+  // New states for doctor selection
+  const [doctors, setDoctors] = useState([]);
+  const [selectedDoctor, setSelectedDoctor] = useState("");
+  const [doctorAvailability, setDoctorAvailability] = useState([]);
 
   useEffect(() => {
+    // Fetch appointments
     api.get("/doctor/appointments")
       .then(res => setAppointments(res.data || []))
-      .catch(() => setAppointments([]))
-      .finally(() => setLoading(false));
+      .catch(() => setAppointments([]));
+    
+    // Fetch doctors
+    fetchDoctors();
   }, []);
+
+  const fetchDoctors = async () => {
+    try {
+      const doctorsRes = await api.get("/doctors");
+      const allDoctors = doctorsRes.data || [];
+      setDoctors(allDoctors);
+    } catch (err) {
+      console.error("Error fetching doctors:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDoctorChange = (doctorId) => {
+    setSelectedDoctor(doctorId);
+    if (doctorId) {
+      fetchDoctorAvailability(doctorId);
+    } else {
+      setDoctorAvailability([]);
+    }
+  };
+
+  const fetchDoctorAvailability = async (doctorId) => {
+    try {
+      const res = await api.get(`/doctor/availability/${doctorId}`);
+      console.log("Doctor availability response:", res.data);
+      
+      let availabilityData = [];
+      
+      if (res.data && res.data.availability) {
+        availabilityData = res.data.availability;
+      } else if (res.data && Array.isArray(res.data)) {
+        availabilityData = res.data;
+      } else if (res.data && res.data.slots) {
+        availabilityData = res.data.slots;
+      } else if (res.data) {
+        availabilityData = Array.isArray(res.data) ? res.data : [res.data];
+      }
+      
+      const normalizedAvailability = Array.isArray(availabilityData)
+        ? availabilityData
+        : availabilityData ? [availabilityData] : [];
+      
+      const activeSlots = normalizedAvailability.filter(slot => slot.isActive !== false);
+      setDoctorAvailability(activeSlots);
+    } catch (err) {
+      console.error("Error fetching doctor availability:", err);
+      setDoctorAvailability([]);
+    }
+  };
 
   const handleAction = async (id, status) => {
     try {
@@ -56,6 +116,100 @@ export default function DoctorAppointments() {
           {error}
         </div>
       )}
+
+      {/* Doctor Selection and Sessions Section */}
+      <div className="mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Doctor Selection */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                <User size={16} />
+                Select Doctor
+              </label>
+              <select
+                value={selectedDoctor}
+                onChange={(e) => handleDoctorChange(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a doctor</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor._id} value={doctor._id}>
+                    Dr. {doctor.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Selected Doctor Info */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                <Calendar size={16} />
+                Available Sessions
+              </label>
+              <div className="text-sm text-gray-600">
+                {selectedDoctor 
+                  ? `${doctorAvailability.length} sessions available`
+                  : "Please select a doctor"
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sessions Display */}
+        {doctorAvailability.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="space-y-4">
+              {doctorAvailability.map((slot) => (
+                <div key={slot._id} className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-shadow">
+                  <div className="flex items-center justify-between">
+                    {/* Left Side: Calendar, Day, Date */}
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Calendar size={20} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-800 text-lg">
+                          {slot.day}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {slot.date && !isNaN(new Date(slot.date).getTime()) 
+                            ? new Date(slot.date).toLocaleDateString('en-US', { 
+                                month: 'long', 
+                                day: 'numeric'
+                              })
+                            : 'Date not set'
+                          }
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Right Side: Available Badge, Time, Book Button */}
+                    <div className="flex items-center gap-4">
+                      <span className="bg-green-100 text-green-700 text-xs font-medium px-3 py-1 rounded-full">
+                        Available
+                      </span>
+                      
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-gray-700 mb-1">Time</div>
+                        <div className="text-lg font-semibold text-gray-800">
+                          {slot.startTime} - {slot.endTime}
+                        </div>
+                      </div>
+                      
+                      <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        <Plus size={14} />
+                        Book Now
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Filters */}
       <div className="flex gap-2 mb-6 flex-wrap">

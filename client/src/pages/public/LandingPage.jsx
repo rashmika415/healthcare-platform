@@ -15,7 +15,7 @@ const trustMetrics = [
 ];
 
 const navLinks = [
-  { label: 'Appointments', href: '/#appointments' },
+  { label: 'Appointments', href: '/appointments' },
   { label: 'Telemedicine', href: '/#telemedicine' },
   { label: 'Messages', href: '/#messages' },
   { label: 'Health Records', href: '/#records' }
@@ -65,13 +65,23 @@ const NexusHealth = () => {
           <div className="text-2xl font-headline font-bold tracking-tighter text-blue-950">Nexus Health</div>
           <div className="hidden md:flex items-center gap-10">
             {navLinks.map((link, index) => (
-              <a
-                key={link.label}
-                className={index === 0 ? 'text-blue-900 border-b-2 border-blue-900 pb-1' : 'text-slate-500 hover:text-blue-900 transition-colors'}
-                href={link.href}
-              >
-                {link.label}
-              </a>
+              link.label === 'Appointments' ? (
+                <Link
+                  key={link.label}
+                  to={link.href}
+                  className="text-blue-900 border-b-2 border-blue-900 pb-1"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  className="text-slate-500 hover:text-blue-900 transition-colors"
+                  href={link.href}
+                >
+                  {link.label}
+                </a>
+              )
             ))}
           </div>
           <div className="flex items-center gap-3 sm:gap-5">
@@ -120,14 +130,25 @@ const NexusHealth = () => {
         <div className={`md:hidden px-4 sm:px-6 pb-4 transition-all duration-300 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
           <div className="rounded-2xl border border-blue-100 bg-white/95 shadow-lg p-4 space-y-3">
             {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setIsMenuOpen(false)}
-                className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
-              >
-                {link.label}
-              </a>
+              link.label === 'Appointments' ? (
+                <Link
+                  key={link.label}
+                  to={link.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-blue-900 bg-blue-50 font-medium"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
+                >
+                  {link.label}
+                </a>
+              )
             ))}
             {!user && (
               <div className="pt-2 flex gap-3">
@@ -193,9 +214,11 @@ const NexusHealth = () => {
                     type="text" 
                   />
                 </div>
-                <button className="bg-[#001836] bg-gradient-to-br from-[#001836] to-[#002d5b] text-white px-8 py-3 rounded-xl font-semibold shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-transform">
-                  Find Care
-                </button>
+                <Link to="/appointments">
+                  <button className="bg-[#001836] bg-gradient-to-br from-[#001836] to-[#002d5b] text-white px-8 py-3 rounded-xl font-semibold shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-transform">
+                    Find Care
+                  </button>
+                </Link>
               </div>
 
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl">
