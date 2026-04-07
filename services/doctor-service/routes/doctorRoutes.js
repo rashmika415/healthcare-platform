@@ -35,9 +35,7 @@ router.get('/unverified', authMiddleware, doctorController.getUnverifiedDoctors)
 // ✅ GET VERIFIED DOCTORS (ADMIN)
 router.get('/verified', authMiddleware, doctorController.getVerifiedDoctors);
 
-
 // ✅ GET DOCTOR BY ID (ADMIN)
 router.get('/:doctorId', authMiddleware, doctorController.getDoctorById);
-
 
 module.exports = router;

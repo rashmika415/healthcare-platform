@@ -31,6 +31,15 @@ import Profile from "./pages/doctor/Profile";
 import Availability from "./pages/doctor/Availability";
 import VideoServiceTest from './pages/video/VideoServiceTest';
 
+
+// //Appointment pages
+import AddAppointment from './components/appointment/AddAppointment';
+import AppointmentDashboard from './components/appointment/AppointmentDashboard';
+import ViewAppointment from './components/appointment/ViewAppointment';
+
+
+
+
 // // Admin pages
 // import AdminDashboard from './pages/admin/AdminDashboard';
 
@@ -115,6 +124,27 @@ export default function App() {
 
           {/* Video Service standalone test page (your part) */}
           <Route path="/video-test" element={<VideoServiceTest />} />
+
+
+          {/* Appointment routes */}
+          <Route path="/patient/appointments" element={
+            <PrivateRoute role="patient">
+              <AppointmentDashboard />
+            </PrivateRoute>
+          } />
+
+          <Route path="/patient/add-appointment" element={
+            <PrivateRoute role="patient">
+              <AddAppointment />
+            </PrivateRoute>
+          } />
+
+          <Route path="/patient/view-appointments" element={
+            <PrivateRoute role="patient">
+              <ViewAppointment />
+            </PrivateRoute>
+          } />
+
           
 
           {/* ── Admin ──────────────────────────────

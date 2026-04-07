@@ -25,6 +25,15 @@ const NexusHealth = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user } = useAuth();
 
+  const getLink = (link) => {
+    if (link.label === 'Appointments' && user) {
+      if (user.role === 'patient') return '/patient/appointments';
+      if (user.role === 'doctor') return '/doctor/appointments';
+      if (user.role === 'admin') return '/admin/dashboard';
+    }
+    return link.href;
+  };
+
   const getProfilePathByRole = (role) => {
     if (role === 'patient') return '/patient/profile';
     if (role === 'admin') return '/admin/dashboard';
@@ -64,15 +73,28 @@ const NexusHealth = () => {
         <div className="flex justify-between items-center h-20 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto">
           <div className="text-2xl font-headline font-bold tracking-tighter text-blue-950">Nexus Health</div>
           <div className="hidden md:flex items-center gap-10">
-            {navLinks.map((link, index) => (
-              <a
-                key={link.label}
-                className={index === 0 ? 'text-blue-900 border-b-2 border-blue-900 pb-1' : 'text-slate-500 hover:text-blue-900 transition-colors'}
-                href={link.href}
-              >
-                {link.label}
-              </a>
-            ))}
+            {navLinks.map((link, index) => {
+              const targetUrl = getLink(link);
+              const isRoute = targetUrl.startsWith('/');
+
+              return isRoute ? (
+                <Link
+                  key={link.label}
+                  className={index === 0 ? 'text-blue-900 border-b-2 border-blue-900 pb-1' : 'text-slate-500 hover:text-blue-900 transition-colors'}
+                  to={targetUrl}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  className={index === 0 ? 'text-blue-900 border-b-2 border-blue-900 pb-1' : 'text-slate-500 hover:text-blue-900 transition-colors'}
+                  href={targetUrl}
+                >
+                  {link.label}
+                </a>
+              );
+            })}
           </div>
           <div className="flex items-center gap-3 sm:gap-5">
             <button className="hidden sm:inline-flex text-slate-500 hover:text-blue-900 transition-all duration-200 ease-out">
@@ -119,16 +141,30 @@ const NexusHealth = () => {
         </div>
         <div className={`md:hidden px-4 sm:px-6 pb-4 transition-all duration-300 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
           <div className="rounded-2xl border border-blue-100 bg-white/95 shadow-lg p-4 space-y-3">
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setIsMenuOpen(false)}
-                className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
+            {navLinks.map((link) => {
+              const targetUrl = getLink(link);
+              const isRoute = targetUrl.startsWith('/');
+
+              return isRoute ? (
+                <Link
+                  key={link.label}
+                  to={targetUrl}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  href={targetUrl}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
+                >
+                  {link.label}
+                </a>
+              );
+            })}
             {!user && (
               <div className="pt-2 flex gap-3">
                 <Link
@@ -354,7 +390,12 @@ const NexusHealth = () => {
                 <p className="text-blue-100 text-lg mb-10 max-w-2xl mx-auto">Join the new standard of premium healthcare. Experience the Nexus difference today.</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <button className="bg-white text-[#001836] px-10 py-4 rounded-lg font-bold hover:bg-blue-50 hover:-translate-y-0.5 active:translate-y-0 transition-transform">Create Account</button>
-                  <button className="border border-white/30 text-white px-10 py-4 rounded-lg font-bold hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-transform">Schedule Consultation</button>
+                  <Link
+                    to={user ? "/patient/add-appointment" : "/login"}
+                    className="border border-white/30 text-white px-10 py-4 rounded-lg font-bold hover:bg-white/10 hover:-translate-y-0.5 transition-transform"
+                      >
+                     Schedule Consultation
+                  </Link> 
                 </div>
               </div>
             </div>

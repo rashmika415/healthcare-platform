@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/userModel');
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   try {
     // 1. Get token from header
     // Frontend sends: Authorization: Bearer eyJhbGciOi...
@@ -18,13 +19,17 @@ module.exports = (req, res, next) => {
 
     // 2. Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = String(decoded.id);
 
     // 3. Attach user info to request
     // These become headers that get forwarded to downstream services
-    req.headers['x-user-id']    = decoded.id;
+    req.headers['x-user-id']    = userId;
     req.headers['x-user-role']  = decoded.role;
     req.headers['x-user-email'] = decoded.email;
     req.headers['x-user-name']  = decoded.name;
+
+    const user = await User.findById(userId).select('isVerified');
+    req.headers['x-user-verified'] = user && user.isVerified ? 'true' : 'false';
 
     next(); // pass to next middleware or proxy
 

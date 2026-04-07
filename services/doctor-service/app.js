@@ -3,11 +3,12 @@ require('dotenv').config({ path: __dirname + '/.env' });
 
 const express = require("express");
 const mongoose = require("mongoose");
-
+const cors = require("cors");
 
 const app = express();
 
 // ── Middleware ─────────────────────────
+app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // Request logging
@@ -26,6 +27,7 @@ app.use((req, res, next) => {
 });
 
 // Import routes
+const doctorController = require('./controllers/doctorController');
 const doctorRoutes = require('./routes/doctorRoutes');
 const doctorAvailabilityRoutes = require('./routes/doctorAvailabilityRoutes');
 const prescriptionRoutes       = require('./routes/prescriptionRoutes');
@@ -54,6 +56,10 @@ mongoose.connection.on('disconnected', () => console.warn('⚠️ MongoDB discon
 app.get('/', (req, res) => {
   res.send('Doctor Service is running...');
 });
+
+// Public verified-doctor list for booking — on the app (not the router) so it is never
+// mistaken for GET /:doctorId regardless of Express/router ordering.
+app.get('/doctors-list', doctorController.getAllVerifiedDoctorsForPatients);
 
 // Gateway: /doctor/profile → Service: /profile
 app.use('/', doctorAvailabilityRoutes);

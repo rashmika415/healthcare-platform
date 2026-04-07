@@ -14,7 +14,19 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+const appointmentController = require("./Controller/appointmentController");
 const appointmentRoutes = require("./routes/appointmentRoutes");
+
+// Registered on the app so these paths always exist (avoids 404 / router shadowing).
+app.get(
+    "/appointments/verified-doctors",
+    appointmentController.getVerifiedDoctorsForBooking
+);
+app.get(
+    "/appointments/patient/:patientId",
+    appointmentController.getAppointmentsByPatientId
+);
+
 app.use("/appointments", appointmentRoutes);
 
 // Test route
