@@ -110,6 +110,27 @@ app.use('/patients',
   })
 );
 
+// Appointment service (patient booking, lists) — same paths as appointment-service on :3003
+app.use('/appointments',
+  createProxyMiddleware({
+    target: process.env.APPOINTMENT_SERVICE_URL || 'http://localhost:3003',
+    changeOrigin: true,
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error (appointments):', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Appointment service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
 app.use('/doctor',
   authMiddleware,
   createProxyMiddleware({
@@ -126,6 +147,10 @@ app.use('/doctor',
           proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
           proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
           proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
+          const verified = req.headers['x-user-verified'];
+          if (verified !== undefined && verified !== null) {
+            proxyReq.setHeader('x-user-verified', verified);
+          }
         }
         fixRequestBody(proxyReq, req, res);
       },

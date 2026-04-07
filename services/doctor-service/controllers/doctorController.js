@@ -31,7 +31,9 @@ exports.upsertProfile = async (req, res) => {
       specialization,
       experience: Number(experience),
       hospital,
-      bio
+      bio,
+      // Sync with gateway User.isVerified (e.g. admin verified before/after profile exists)
+      isVerified: req.user.isVerified === true,
     };
 
     const isNew = !(await Doctor.findOne({ userId: req.user.id }));
@@ -353,5 +355,18 @@ exports.getDoctorById = async (req, res) => {
   } catch (err) {
     console.error('Error in getDoctorById:', err);
     return res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getAllVerifiedDoctorsForPatients = async (req, res) => {
+  try {
+    const doctors = await Doctor.find({ isVerified: true }).select(
+      "_id userId name specialization experience hospital email"
+    );
+
+    res.status(200).json(doctors);
+  } catch (err) {
+    console.error("Error in getAllVerifiedDoctorsForPatients:", err);
+    res.status(500).json({ error: err.message });
   }
 };
