@@ -354,7 +354,12 @@ const NexusHealth = () => {
                 <p className="text-blue-100 text-lg mb-10 max-w-2xl mx-auto">Join the new standard of premium healthcare. Experience the Nexus difference today.</p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <button className="bg-white text-[#001836] px-10 py-4 rounded-lg font-bold hover:bg-blue-50 hover:-translate-y-0.5 active:translate-y-0 transition-transform">Create Account</button>
-                  <button className="border border-white/30 text-white px-10 py-4 rounded-lg font-bold hover:bg-white/10 hover:-translate-y-0.5 active:translate-y-0 transition-transform">Schedule Consultation</button>
+                  <Link
+                    to={user ? "/patient/add-appointment" : "/login"}
+                    className="border border-white/30 text-white px-10 py-4 rounded-lg font-bold hover:bg-white/10 hover:-translate-y-0.5 transition-transform"
+                      >
+                     Schedule Consultation
+                  </Link> 
                 </div>
               </div>
             </div>
