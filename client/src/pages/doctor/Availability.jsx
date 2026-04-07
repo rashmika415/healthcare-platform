@@ -4,16 +4,19 @@ import Sidebar from "../../components/doctor/Sidebar";
 import Topbar from "../../components/doctor/Topbar";
 import { Clock, Plus, Trash2, CheckCircle, XCircle, Calendar } from "lucide-react";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const toDateKeyLocal = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
-const DAY_COLORS = {
-  Monday:    { bg: "bg-blue-50",   text: "text-blue-600",   dot: "bg-blue-500"   },
-  Tuesday:   { bg: "bg-purple-50", text: "text-purple-600", dot: "bg-purple-500" },
-  Wednesday: { bg: "bg-green-50",  text: "text-green-600",  dot: "bg-green-500"  },
-  Thursday:  { bg: "bg-orange-50", text: "text-orange-600", dot: "bg-orange-500" },
-  Friday:    { bg: "bg-pink-50",   text: "text-pink-600",   dot: "bg-pink-500"   },
-  Saturday:  { bg: "bg-yellow-50", text: "text-yellow-600", dot: "bg-yellow-500" },
-  Sunday:    { bg: "bg-red-50",    text: "text-red-600",    dot: "bg-red-500"    },
+const formatDateLabel = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "Invalid date";
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 };
 
 export default function DoctorAvailability() {
@@ -24,9 +27,9 @@ export default function DoctorAvailability() {
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState(null);
   const [apiError, setApiError] = useState(null);
-  const [selectedDay, setSelectedDay] = useState("All");
+  const [selectedDate, setSelectedDate] = useState("All");
 
-  const [form, setForm] = useState({ day: "Monday", startTime: "", endTime: "" });
+  const [form, setForm] = useState({ date: "", startTime: "", endTime: "" });
 
   // Fetch availability
   useEffect(() => {
@@ -77,15 +80,15 @@ const showMessage = (type, text) => {
   const handleAdd = async (e) => {
     if (e) e.preventDefault(); // 🔥 prevent refresh
 
-    if (!form.startTime || !form.endTime) {
-      showMessage("error", "Please fill start and end time.");
+    if (!form.date || !form.startTime || !form.endTime) {
+      showMessage("error", "Please fill date, start time and end time.");
       return;
     }
     try {
       setAdding(true);
       await api.post("/doctor/availability", form);
       showMessage("success", "Slot added successfully!");
-      setForm({ day: "Monday", startTime: "", endTime: "" });
+      setForm({ date: "", startTime: "", endTime: "" });
       fetchSlots();
     } catch (err) {
       showMessage("error", err.response?.data?.error || "Failed to add slot.");
@@ -97,7 +100,7 @@ const showMessage = (type, text) => {
   const handleToggle = async (slot) => {
     try {
       await api.patch(`/doctor/availability/${slot._id}`, {
-        day: slot.day,
+        date: toDateKeyLocal(slot.date),
         startTime: slot.startTime,
         endTime: slot.endTime,
         isActive: !slot.isActive,
@@ -119,13 +122,16 @@ const showMessage = (type, text) => {
     }
   };
 
-  // Group slots by day
-  const grouped = DAYS.reduce((acc, day) => {
-    acc[day] = slots.filter((s) => s.day === day);
+  const grouped = slots.reduce((acc, slot) => {
+    const key = toDateKeyLocal(slot.date);
+    if (!key) return acc;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(slot);
     return acc;
   }, {});
 
-  const filteredDays = selectedDay === "All" ? DAYS : [selectedDay];
+  const availableDates = Object.keys(grouped).sort((a, b) => new Date(a) - new Date(b));
+  const filteredDates = selectedDate === "All" ? availableDates : [selectedDate];
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -199,29 +205,15 @@ const showMessage = (type, text) => {
               </div>
             )}
 
-            {/* Day Selector */}
+            {/* Date Selector */}
             <div className="mb-4">
-              <label className="text-xs font-semibold text-gray-500 mb-2 block">Day</label>
-              <div className="grid grid-cols-2 gap-2">
-                {DAYS.map((day) => {
-                  const c = DAY_COLORS[day];
-                  const active = form.day === day;
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => setForm({ ...form, day })}
-                      className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border
-                        ${active
-                          ? `${c.bg} ${c.text} border-current shadow-sm`
-                          : "bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100"
-                        }`}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
-              </div>
+              <label className="text-xs font-semibold text-gray-500 mb-2 block">Date</label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             {/* Time Inputs */}
@@ -265,22 +257,21 @@ const showMessage = (type, text) => {
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-bold text-gray-800">My Schedule</h2>
 
-              {/* Day Filter */}
+              {/* Date Filter */}
               <div className="flex gap-1.5 flex-wrap">
-                {["All", ...DAYS.map((d) => d.slice(0, 3))].map((label, i) => {
-                  const fullDay = i === 0 ? "All" : DAYS[i - 1];
-                  const active = selectedDay === fullDay;
+                {["All", ...availableDates].map((label) => {
+                  const active = selectedDate === label;
                   return (
                     <button
                       key={label}
-                      onClick={() => setSelectedDay(fullDay)}
+                      onClick={() => setSelectedDate(label)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all
                         ${active
                           ? "bg-blue-600 text-white shadow-sm"
                           : "bg-gray-100 text-gray-400 hover:bg-gray-200"
                         }`}
                     >
-                      {label}
+                      {label === "All" ? "All" : label}
                     </button>
                   );
                 })}
@@ -293,42 +284,43 @@ const showMessage = (type, text) => {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredDays.map((day) => {
-                  const daySlots = grouped[day];
-                  if (daySlots.length === 0 && selectedDay !== "All") {
+                {filteredDates.map((dateKey) => {
+                  const dateSlots = grouped[dateKey] || [];
+                  if (dateSlots.length === 0 && selectedDate !== "All") {
                     return (
-                      <div key={day} className="text-center py-10 text-gray-400 text-sm">
-                        No slots for {day}
+                      <div key={dateKey} className="text-center py-10 text-gray-400 text-sm">
+                        No slots for {dateKey}
                       </div>
                     );
                   }
-                  if (daySlots.length === 0) return null;
-
-                  const c = DAY_COLORS[day];
+                  if (dateSlots.length === 0) return null;
                   return (
-                    <div key={day}>
-                      {/* Day Header */}
+                    <div key={dateKey}>
+                      {/* Date Header */}
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`w-2 h-2 rounded-full ${c.dot}`} />
-                        <span className={`text-xs font-bold ${c.text}`}>{day}</span>
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="text-xs font-bold text-blue-600">{formatDateLabel(dateKey)}</span>
                         <span className="text-xs text-gray-300 font-medium">
-                          {daySlots.length} slot{daySlots.length > 1 ? "s" : ""}
+                          {dateSlots.length} slot{dateSlots.length > 1 ? "s" : ""}
                         </span>
                       </div>
 
                       <div className="space-y-2 mb-2">
-                        {daySlots.map((slot) => (
+                        {dateSlots
+                          .slice()
+                          .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
+                          .map((slot) => (
                           <div
                             key={slot._id}
                             className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all
                               ${slot.isActive
-                                ? `${c.bg} border-transparent`
+                                ? "bg-blue-50 border-transparent"
                                 : "bg-gray-50 border-gray-100 opacity-60"
                               }`}
                           >
                             <div className="flex items-center gap-3">
-                              <Clock size={14} className={slot.isActive ? c.text : "text-gray-400"} />
-                              <span className={`text-sm font-semibold ${slot.isActive ? c.text : "text-gray-400"}`}>
+                              <Clock size={14} className={slot.isActive ? "text-blue-600" : "text-gray-400"} />
+                              <span className={`text-sm font-semibold ${slot.isActive ? "text-blue-600" : "text-gray-400"}`}>
                                 {slot.startTime} – {slot.endTime}
                               </span>
                             </div>

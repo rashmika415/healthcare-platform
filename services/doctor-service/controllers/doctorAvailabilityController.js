@@ -1,8 +1,6 @@
 const DoctorAvailability = require('../models/doctorAvailabilityModel');
 const Doctor = require('../models/doctorModels');
 
-const ALLOWED_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
 const normalizeTime = (value) => {
   if (typeof value !== 'string') return null;
   const match = value.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
@@ -10,6 +8,23 @@ const normalizeTime = (value) => {
   const hour = match[1].padStart(2, '0');
   const minute = match[2];
   return `${hour}:${minute}`;
+};
+
+const normalizeDate = (value) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  // Expect YYYY-MM-DD (HTML date input format)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  const d = new Date(`${trimmed}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+};
+
+const toDateKeyUTC = (dateObj) => {
+  const y = dateObj.getUTCFullYear();
+  const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
 const toMinutes = (hhmm) => {
@@ -40,12 +55,13 @@ const ensureDoctorAccess = async (req, res) => {
   return doctorProfile;
 };
 
-const validateSlotInput = (day, startTime, endTime) => {
-  if (!day || !startTime || !endTime) {
-    return 'day, startTime and endTime are required';
+const validateSlotInput = (date, startTime, endTime) => {
+  if (!date || !startTime || !endTime) {
+    return 'date, startTime and endTime are required';
   }
-  if (!ALLOWED_DAYS.includes(day)) {
-    return `day must be one of: ${ALLOWED_DAYS.join(', ')}`;
+  const normalizedDate = normalizeDate(date);
+  if (!normalizedDate) {
+    return 'date must be in YYYY-MM-DD format';
   }
   const normalizedStart = normalizeTime(startTime);
   const normalizedEnd = normalizeTime(endTime);
@@ -63,19 +79,24 @@ exports.addAvailability = async (req, res) => {
     const doctorProfile = await ensureDoctorAccess(req, res);
     if (!doctorProfile) return;
 
-    const { day, startTime, endTime } = req.body || {};
-    const validationError = validateSlotInput(day, startTime, endTime);
+    const { date, startTime, endTime } = req.body || {};
+    const validationError = validateSlotInput(date, startTime, endTime);
     if (validationError) return res.status(400).json({ error: validationError });
 
     const normalizedStart = normalizeTime(startTime);
     const normalizedEnd = normalizeTime(endTime);
+    const normalizedDate = normalizeDate(date);
+    const dateKey = toDateKeyUTC(normalizedDate);
 
-    const daySlots = await DoctorAvailability.find({
+    const dateSlots = await DoctorAvailability.find({
       doctorUserId: req.user.id,
-      day
+      date: {
+        $gte: new Date(`${dateKey}T00:00:00.000Z`),
+        $lt: new Date(`${dateKey}T23:59:59.999Z`)
+      }
     });
 
-    const overlapSlot = daySlots.find((slot) =>
+    const overlapSlot = dateSlots.find((slot) =>
       hasOverlap(normalizedStart, normalizedEnd, slot.startTime, slot.endTime)
     );
     if (overlapSlot) {
@@ -87,7 +108,7 @@ exports.addAvailability = async (req, res) => {
 
     const availability = await DoctorAvailability.create({
       doctorUserId: req.user.id,
-      day,
+      date: normalizedDate,
       startTime: normalizedStart,
       endTime: normalizedEnd
     });
@@ -106,16 +127,21 @@ exports.getAvailability = async (req, res) => {
     const doctorProfile = await ensureDoctorAccess(req, res);
     if (!doctorProfile) return;
 
-    const { day } = req.query;
+    const { date } = req.query;
     const filter = { doctorUserId: req.user.id };
-    if (day) {
-      if (!ALLOWED_DAYS.includes(day)) {
-        return res.status(400).json({ error: `day must be one of: ${ALLOWED_DAYS.join(', ')}` });
+    if (date) {
+      const normalizedDate = normalizeDate(date);
+      if (!normalizedDate) {
+        return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
       }
-      filter.day = day;
+      const dateKey = toDateKeyUTC(normalizedDate);
+      filter.date = {
+        $gte: new Date(`${dateKey}T00:00:00.000Z`),
+        $lt: new Date(`${dateKey}T23:59:59.999Z`)
+      };
     }
 
-    const slots = await DoctorAvailability.find(filter).sort({ day: 1, startTime: 1 });
+    const slots = await DoctorAvailability.find(filter).sort({ date: 1, startTime: 1 });
     const activeCount = slots.filter((slot) => slot.isActive).length;
 
     return res.status(200).json({
@@ -124,7 +150,8 @@ exports.getAvailability = async (req, res) => {
         userId: doctorProfile.userId,
         name: doctorProfile.name,
         specialization: doctorProfile.specialization,
-        isVerified: doctorProfile.isVerified
+        isVerified: doctorProfile.isVerified,
+        consultationFee: doctorProfile.consultationFee,
       },
       summary: {
         totalSlots: slots.length,
@@ -147,22 +174,27 @@ exports.updateAvailability = async (req, res) => {
     const slot = await DoctorAvailability.findOne({ _id: id, doctorUserId: req.user.id });
     if (!slot) return res.status(404).json({ error: 'Slot not found' });
 
-    const nextDay = req.body?.day ?? slot.day;
+    const nextDate = req.body?.date ?? toDateKeyUTC(new Date(slot.date));
     const nextStart = req.body?.startTime ?? slot.startTime;
     const nextEnd = req.body?.endTime ?? slot.endTime;
 
-    const validationError = validateSlotInput(nextDay, nextStart, nextEnd);
+    const validationError = validateSlotInput(nextDate, nextStart, nextEnd);
     if (validationError) return res.status(400).json({ error: validationError });
 
     const normalizedStart = normalizeTime(nextStart);
     const normalizedEnd = normalizeTime(nextEnd);
+    const normalizedDate = normalizeDate(nextDate);
+    const dateKey = toDateKeyUTC(normalizedDate);
 
-    const daySlots = await DoctorAvailability.find({
+    const dateSlots = await DoctorAvailability.find({
       _id: { $ne: id },
       doctorUserId: req.user.id,
-      day: nextDay
+      date: {
+        $gte: new Date(`${dateKey}T00:00:00.000Z`),
+        $lt: new Date(`${dateKey}T23:59:59.999Z`)
+      }
     });
-    const overlapSlot = daySlots.find((item) =>
+    const overlapSlot = dateSlots.find((item) =>
       hasOverlap(normalizedStart, normalizedEnd, item.startTime, item.endTime)
     );
     if (overlapSlot) {
@@ -172,7 +204,7 @@ exports.updateAvailability = async (req, res) => {
       });
     }
 
-    slot.day = nextDay;
+    slot.date = normalizedDate;
     slot.startTime = normalizedStart;
     slot.endTime = normalizedEnd;
     if (req.body?.isActive !== undefined) slot.isActive = Boolean(req.body.isActive);
@@ -210,15 +242,20 @@ exports.deleteAvailability = async (req, res) => {
 exports.getAvailabilityByDoctorId = async (req, res) => {
   try {
     const { doctorId } = req.params;
-    const { day } = req.query;
+    const { date } = req.query;
 
     const filter = { isActive: true };
 
-    if (day) {
-      if (!ALLOWED_DAYS.includes(day)) {
-        return res.status(400).json({ error: `day must be one of: ${ALLOWED_DAYS.join(', ')}` });
+    if (date) {
+      const normalizedDate = normalizeDate(date);
+      if (!normalizedDate) {
+        return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
       }
-      filter.day = day;
+      const dateKey = toDateKeyUTC(normalizedDate);
+      filter.date = {
+        $gte: new Date(`${dateKey}T00:00:00.000Z`),
+        $lt: new Date(`${dateKey}T23:59:59.999Z`)
+      };
     }
 
     // Accept either Doctor profile _id or doctor userId to simplify integrations.
@@ -233,7 +270,7 @@ exports.getAvailabilityByDoctorId = async (req, res) => {
       filter.doctorUserId = doctorProfile.userId;
     }
 
-    const availability = await DoctorAvailability.find(filter).sort({ day: 1, startTime: 1 });
+    const availability = await DoctorAvailability.find(filter).sort({ date: 1, startTime: 1 });
 
     return res.status(200).json({
       doctor: {
@@ -241,7 +278,8 @@ exports.getAvailabilityByDoctorId = async (req, res) => {
         userId: doctorProfile.userId,
         name: doctorProfile.name,
         specialization: doctorProfile.specialization,
-        isVerified: doctorProfile.isVerified
+        isVerified: doctorProfile.isVerified,
+        consultationFee: doctorProfile.consultationFee,
       },
       availability
     });
@@ -252,16 +290,23 @@ exports.getAvailabilityByDoctorId = async (req, res) => {
 
 exports.getDoctorsByDay = async (req, res) => {
   try {
-    const day = req.query.day; // e.g., ?day=Monday
-    if (!day) {
-      return res.status(400).json({ error: 'Day query parameter is required' });
+    const date = req.query.date; // e.g., ?date=2026-04-07
+    const normalizedDate = normalizeDate(date);
+    if (!normalizedDate) {
+      return res.status(400).json({ error: 'date query parameter is required (YYYY-MM-DD)' });
     }
 
-    // Find all active availability slots for this day
-    const slots = await DoctorAvailability.find({ day, isActive: true });
+    const dateKey = toDateKeyUTC(normalizedDate);
+    const slots = await DoctorAvailability.find({
+      date: {
+        $gte: new Date(`${dateKey}T00:00:00.000Z`),
+        $lt: new Date(`${dateKey}T23:59:59.999Z`)
+      },
+      isActive: true
+    });
 
     if (slots.length === 0) {
-      return res.json({ message: `No doctors available on ${day}` });
+      return res.json({ message: `No doctors available on ${dateKey}` });
     }
 
     // Group slots by doctor
@@ -286,6 +331,7 @@ exports.getDoctorsByDay = async (req, res) => {
       }
 
       doctorMap[doctorUserId].slots.push({
+        date: slot.date,
         startTime: slot.startTime,
         endTime: slot.endTime
       });

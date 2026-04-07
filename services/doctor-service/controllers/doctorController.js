@@ -18,10 +18,10 @@ exports.upsertProfile = async (req, res) => {
       return res.status(403).json({ error: 'Only doctors allowed' });
     }
 
-    const { specialization, experience, hospital, bio } = req.body || {};
+    const { specialization, experience, hospital, bio, consultationFee } = req.body || {};
 
-    if (!specialization || experience === undefined || !hospital || !bio) {
-      return res.status(400).json({ error: 'All fields are required: specialization, experience, hospital, bio' });
+    if (!specialization || experience === undefined || !hospital || !bio || consultationFee === undefined) {
+      return res.status(400).json({ error: 'All fields are required: specialization, experience, hospital, bio, consultationFee' });
     }
 
     const profileData = {
@@ -31,7 +31,8 @@ exports.upsertProfile = async (req, res) => {
       specialization,
       experience: Number(experience),
       hospital,
-      bio
+      bio,
+      consultationFee: Number(consultationFee),
     };
 
     const isNew = !(await Doctor.findOne({ userId: req.user.id }));
