@@ -7,6 +7,11 @@ const role = require('../middleware/roleMiddleware');
 // Import controller
 const doctorController = require('../controllers/doctorController');
 
+// ── Public doctor browse/search (no auth) ─────────────
+router.get('/public/filters', doctorController.publicFilters);
+router.get('/public/doctors', doctorController.publicSearchDoctors);
+router.get('/public/doctors/:doctorId', doctorController.publicGetDoctorProfile);
+
 
 // 🔹 GET Doctor Profile
 router.get('/profile', authMiddleware, doctorController.getProfile);

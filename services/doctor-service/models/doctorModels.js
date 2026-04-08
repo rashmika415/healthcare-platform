@@ -45,6 +45,12 @@ const doctorSchema = new mongoose.Schema(
       trim: true,
     },
 
+    consultationFee: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
     // 🔐 Verification status
     isVerified: {
       type: Boolean,

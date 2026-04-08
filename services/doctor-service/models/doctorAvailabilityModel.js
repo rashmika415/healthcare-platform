@@ -7,10 +7,9 @@ const doctorAvailabilitySchema = new mongoose.Schema(
       type: String,
       required: true
     },
-    day: {
-      type: String,
-      required: true,
-      enum: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+    date: {
+      type: Date,
+      required: true
     },
     startTime: {
       type: String,
