@@ -7,6 +7,9 @@ import PrivateRoute from './components/PrivateRoute';
 import LandingPage  from './pages/public/LandingPage';
 import Login        from './pages/public/Login';
 import Register     from './pages/public/Register';
+import AppointmentSearch from './pages/public/AppointmentSearch';
+import AppointmentResults from './pages/public/AppointmentResults';
+import DoctorPublicProfile from './pages/public/DoctorPublicProfile';
 
 import AdminDashboard    from './pages/admin/AdminDashboard';
 import AdminDoctors      from './pages/admin/AdminDoctors';
@@ -44,6 +47,9 @@ export default function App() {
           <Route path="/"         element={<LandingPage />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/appointments" element={<AppointmentSearch />} />
+          <Route path="/appointments/results" element={<AppointmentResults />} />
+          <Route path="/doctors/:doctorId" element={<DoctorPublicProfile />} />
 
 <Route path="/admin/dashboard" element={
   <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
