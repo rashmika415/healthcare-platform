@@ -12,7 +12,7 @@ import PatientLayout from './Patientlayout ';
 export default function PatientReports() {
   const [reports,   setReports]   = useState([]);
   const [doctors, setDoctors] = useState([]);
-  const [visibilityFilter, setVisibilityFilter] = useState('all');
+  const [visibilityFilter, setVisibilityFilter] = useState('private');
   const [uploadMeta, setUploadMeta] = useState({
     title: '',
     reportType: 'other',
@@ -187,8 +187,11 @@ export default function PatientReports() {
     return getVisibility(report) === visibilityFilter;
   });
 
+  const privateCount = reports.filter((report) => getVisibility(report) === 'private').length;
+  const sharedCount = reports.filter((report) => getVisibility(report) === 'shared').length;
+
   return (
-    <PatientLayout title="Medical Reports" subtitle="Upload and manage your medical documents">
+    <PatientLayout title="Medical Reports" subtitle="Private vault for your records, plus shared doctor reports">
 
       {success && <div style={s.success}>✓ {success}</div>}
       {error   && <div style={s.error}>{error}</div>}
@@ -306,27 +309,43 @@ export default function PatientReports() {
 
       {/* Reports list */}
       <div style={s.listHead}>
-        <span style={s.listTitle}>Your Reports</span>
+        <span style={s.listTitle}>
+          {visibilityFilter === 'private'
+            ? 'Private Vault'
+            : visibilityFilter === 'shared'
+              ? 'Shared With Doctors'
+              : 'All Reports'}
+        </span>
         <span style={s.count}>{reports.length} file{reports.length !== 1 ? 's' : ''}</span>
       </div>
+      <div style={s.statsRow}>
+        <div style={s.statCard}>
+          <div style={s.statLabel}>Private Vault</div>
+          <div style={s.statValue}>{privateCount}</div>
+        </div>
+        <div style={s.statCard}>
+          <div style={s.statLabel}>Shared With Doctors</div>
+          <div style={s.statValue}>{sharedCount}</div>
+        </div>
+      </div>
       <div style={s.filterRow}>
-        <button
-          onClick={() => setVisibilityFilter('all')}
-          style={{ ...s.filterBtn, ...(visibilityFilter === 'all' ? s.filterBtnActive : {}) }}
-        >
-          All
-        </button>
         <button
           onClick={() => setVisibilityFilter('private')}
           style={{ ...s.filterBtn, ...(visibilityFilter === 'private' ? s.filterBtnActive : {}) }}
         >
-          Private
+          Private Vault
         </button>
         <button
           onClick={() => setVisibilityFilter('shared')}
           style={{ ...s.filterBtn, ...(visibilityFilter === 'shared' ? s.filterBtnActive : {}) }}
         >
-          Shared With Doctor
+          Shared With Doctors
+        </button>
+        <button
+          onClick={() => setVisibilityFilter('all')}
+          style={{ ...s.filterBtn, ...(visibilityFilter === 'all' ? s.filterBtnActive : {}) }}
+        >
+          All Reports
         </button>
       </div>
 
@@ -393,6 +412,10 @@ const s = {
   listHead:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   listTitle:      { fontSize: 14, fontWeight: 700, color: '#0b1f3a' },
   count:          { fontSize: 12, color: '#7a92aa', background: '#f0f4f9', padding: '3px 10px', borderRadius: 20 },
+  statsRow:       { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 12 },
+  statCard:       { background: '#fff', border: '1px solid #e4ecf7', borderRadius: 10, padding: '10px 12px' },
+  statLabel:      { fontSize: 12, color: '#6f86a3' },
+  statValue:      { fontSize: 19, fontWeight: 700, color: '#11345c', marginTop: 3 },
   filterRow:      { display: 'flex', gap: 8, marginBottom: 12 },
   filterBtn:      { padding: '6px 12px', border: '1px solid #d6e2f4', borderRadius: 8, background: '#fff', color: '#4a6380', cursor: 'pointer', fontSize: 12, fontWeight: 600 },
   filterBtnActive:{ background: '#ebf2ff', border: '1px solid #1a56db', color: '#1a56db' },
