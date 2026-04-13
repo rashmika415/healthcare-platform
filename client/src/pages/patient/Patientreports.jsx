@@ -192,21 +192,24 @@ export default function PatientReports() {
 
   return (
     <PatientLayout title="Medical Reports" subtitle="Private vault for your records, plus shared doctor reports">
+      <style>{reportCss}</style>
 
       {success && <div style={s.success}>✓ {success}</div>}
       {error   && <div style={s.error}>{error}</div>}
 
       {/* Upload zone */}
-      <div style={s.metaPanel}>
-        <div style={s.metaGrid}>
+      <div style={s.metaPanel} className="patient-reports-meta-panel">
+        <div style={s.metaGrid} className="patient-reports-meta-grid">
           <input
             style={s.input}
+            className="patient-report-input"
             placeholder="Report title (optional)"
             value={uploadMeta.title}
             onChange={(e) => setUploadMeta((prev) => ({ ...prev, title: e.target.value }))}
           />
           <select
             style={s.input}
+            className="patient-report-input"
             value={uploadMeta.reportType}
             onChange={(e) => setUploadMeta((prev) => ({ ...prev, reportType: e.target.value }))}
           >
@@ -218,12 +221,14 @@ export default function PatientReports() {
           </select>
           <input
             style={s.input}
+            className="patient-report-input"
             type="date"
             value={uploadMeta.reportDate}
             onChange={(e) => setUploadMeta((prev) => ({ ...prev, reportDate: e.target.value }))}
           />
           <input
             style={s.input}
+            className="patient-report-input"
             placeholder="Hospital/Lab name"
             value={uploadMeta.hospitalOrLabName}
             onChange={(e) => setUploadMeta((prev) => ({ ...prev, hospitalOrLabName: e.target.value }))}
@@ -231,11 +236,12 @@ export default function PatientReports() {
         </div>
         <textarea
           style={s.textarea}
+          className="patient-report-input"
           placeholder="Description (optional)"
           value={uploadMeta.description}
           onChange={(e) => setUploadMeta((prev) => ({ ...prev, description: e.target.value }))}
         />
-        <div style={s.shareRow}>
+        <div style={s.shareRow} className="patient-reports-share-row">
           <label style={s.radioLabel}>
             <input
               type="radio"
@@ -256,6 +262,7 @@ export default function PatientReports() {
             <>
               <select
                 style={s.input}
+                className="patient-report-input"
                 value={uploadMeta.doctorUserId}
                 onChange={(e) => {
                   const selected = doctors.find((d) => (d.userId || d._id) === e.target.value);
@@ -275,6 +282,7 @@ export default function PatientReports() {
               </select>
               <input
                 style={s.input}
+                className="patient-report-input"
                 type="email"
                 placeholder="Or type doctor email manually"
                 value={uploadMeta.doctorEmail}
@@ -289,6 +297,7 @@ export default function PatientReports() {
       </div>
       <div
         style={{ ...s.dropZone, ...(dragOver ? s.dropZoneActive : {}) }}
+        className="patient-reports-dropzone"
         onDragOver={e  => { e.preventDefault(); setDragOver(true);  }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => {
@@ -318,31 +327,34 @@ export default function PatientReports() {
         </span>
         <span style={s.count}>{reports.length} file{reports.length !== 1 ? 's' : ''}</span>
       </div>
-      <div style={s.statsRow}>
-        <div style={s.statCard}>
+      <div style={s.statsRow} className="patient-reports-stats-row">
+        <div style={s.statCard} className="patient-reports-stat-card">
           <div style={s.statLabel}>Private Vault</div>
           <div style={s.statValue}>{privateCount}</div>
         </div>
-        <div style={s.statCard}>
+        <div style={s.statCard} className="patient-reports-stat-card">
           <div style={s.statLabel}>Shared With Doctors</div>
           <div style={s.statValue}>{sharedCount}</div>
         </div>
       </div>
-      <div style={s.filterRow}>
+      <div style={s.filterRow} className="patient-reports-filter-row">
         <button
           onClick={() => setVisibilityFilter('private')}
+          className="patient-reports-filter-btn"
           style={{ ...s.filterBtn, ...(visibilityFilter === 'private' ? s.filterBtnActive : {}) }}
         >
           Private Vault
         </button>
         <button
           onClick={() => setVisibilityFilter('shared')}
+          className="patient-reports-filter-btn"
           style={{ ...s.filterBtn, ...(visibilityFilter === 'shared' ? s.filterBtnActive : {}) }}
         >
           Shared With Doctors
         </button>
         <button
           onClick={() => setVisibilityFilter('all')}
+          className="patient-reports-filter-btn"
           style={{ ...s.filterBtn, ...(visibilityFilter === 'all' ? s.filterBtnActive : {}) }}
         >
           All Reports
@@ -363,7 +375,7 @@ export default function PatientReports() {
             const { icon, color, bg } = getIcon(r.fileType);
             const visibility = getVisibility(r);
             return (
-              <div key={r._id} style={s.reportCard}>
+              <div key={r._id} style={s.reportCard} className="patient-report-card">
                 <div style={{ ...s.fileIcon, background: bg, color }}>{icon}</div>
                 <div style={s.fileInfo}>
                   <div style={s.fileName}>{r.filename}</div>
@@ -374,14 +386,14 @@ export default function PatientReports() {
                     {visibility === 'shared' ? 'Shared With Doctor' : 'Private'}
                   </div>
                 </div>
-                <div style={s.fileActions}>
-                  <button onClick={() => handleOpen(r)} style={s.viewBtn}>
+                <div style={s.fileActions} className="patient-report-actions">
+                  <button onClick={() => handleOpen(r)} style={s.viewBtn} className="patient-report-action-btn">
                     Open ↗
                   </button>
-                  <button onClick={() => handleDownload(r)} style={s.downloadBtn}>
+                  <button onClick={() => handleDownload(r)} style={s.downloadBtn} className="patient-report-action-btn">
                     Download
                   </button>
-                  <button onClick={() => handleDelete(r._id)} style={s.deleteBtn}>
+                  <button onClick={() => handleDelete(r._id)} style={s.deleteBtn} className="patient-report-action-btn">
                     Delete
                   </button>
                 </div>
@@ -395,45 +407,122 @@ export default function PatientReports() {
 }
 
 const s = {
-  success:        { background: '#f0fdf4', color: '#16a34a', padding: '12px 16px', borderRadius: 10, marginBottom: 16, fontSize: 13, fontWeight: 600 },
-  error:          { background: '#fff0f0', color: '#cc0000', padding: '12px 16px', borderRadius: 10, marginBottom: 16, fontSize: 13 },
-  metaPanel:      { background: '#fff', border: '1px solid #e4ecf7', borderRadius: 14, padding: 14, marginBottom: 14 },
+  success:        { background: '#ecfdf5', color: '#0f7a47', border: '1px solid #c8f1dc', padding: '12px 16px', borderRadius: 12, marginBottom: 16, fontSize: 13, fontWeight: 600 },
+  error:          { background: '#fff1f1', color: '#bf3131', border: '1px solid #f1cece', padding: '12px 16px', borderRadius: 12, marginBottom: 16, fontSize: 13 },
+  metaPanel:      { background: 'linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)', border: '1px solid #d8e6f5', borderRadius: 14, padding: 14, marginBottom: 14, boxShadow: '0 12px 26px rgba(3, 40, 88, 0.06)' },
   metaGrid:       { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 10 },
-  input:          { width: '100%', border: '1px solid #d6e2f4', borderRadius: 8, padding: '9px 10px', fontSize: 13, color: '#1d3557' },
-  textarea:       { width: '100%', minHeight: 68, border: '1px solid #d6e2f4', borderRadius: 8, padding: '9px 10px', fontSize: 13, color: '#1d3557', marginBottom: 10, resize: 'vertical' },
+  input:          { width: '100%', border: '1px solid #cfe0f2', borderRadius: 10, padding: '10px 11px', fontSize: 13, color: '#1d3557', background: '#fdfefe' },
+  textarea:       { width: '100%', minHeight: 68, border: '1px solid #cfe0f2', borderRadius: 10, padding: '10px 11px', fontSize: 13, color: '#1d3557', marginBottom: 10, resize: 'vertical', background: '#fdfefe' },
   shareRow:       { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
-  radioLabel:     { display: 'flex', gap: 6, alignItems: 'center', color: '#334e68', fontSize: 13 },
-  helper:         { color: '#6b7f99', fontSize: 12 },
-  dropZone:       { border: '2px dashed #c3d4f0', borderRadius: 16, padding: '48px 24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s', background: '#f8faff', marginBottom: 28 },
-  dropZoneActive: { border: '2px dashed #1a56db', background: '#ebf2ff' },
+  radioLabel:     { display: 'flex', gap: 6, alignItems: 'center', color: '#334e68', fontSize: 13, padding: '5px 8px', borderRadius: 8, background: '#f2f7fd', border: '1px solid #dce8f4' },
+  helper:         { color: '#5c7893', fontSize: 12 },
+  dropZone:       { border: '2px dashed #bdd2ea', borderRadius: 16, padding: '48px 24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s', background: 'linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%)', marginBottom: 28 },
+  dropZoneActive: { border: '2px dashed #1d4ed8', background: '#eaf3ff' },
   dropIcon:       { fontSize: 40, marginBottom: 12 },
-  dropTitle:      { fontSize: 15, fontWeight: 600, color: '#0b1f3a', marginBottom: 6 },
-  dropSub:        { fontSize: 13, color: '#7a92aa' },
+  dropTitle:      { fontSize: 15, fontWeight: 700, color: '#10314d', marginBottom: 6 },
+  dropSub:        { fontSize: 13, color: '#648199' },
   listHead:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  listTitle:      { fontSize: 14, fontWeight: 700, color: '#0b1f3a' },
-  count:          { fontSize: 12, color: '#7a92aa', background: '#f0f4f9', padding: '3px 10px', borderRadius: 20 },
+  listTitle:      { fontSize: 14, fontWeight: 700, color: '#0e2f4b' },
+  count:          { fontSize: 12, color: '#5f7d95', background: '#eef4fb', border: '1px solid #d6e4f2', padding: '3px 10px', borderRadius: 20 },
   statsRow:       { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 12 },
-  statCard:       { background: '#fff', border: '1px solid #e4ecf7', borderRadius: 10, padding: '10px 12px' },
-  statLabel:      { fontSize: 12, color: '#6f86a3' },
-  statValue:      { fontSize: 19, fontWeight: 700, color: '#11345c', marginTop: 3 },
+  statCard:       { background: 'linear-gradient(180deg, #ffffff 0%, #f6faff 100%)', border: '1px solid #d8e6f5', borderRadius: 12, padding: '11px 12px' },
+  statLabel:      { fontSize: 12, color: '#63819b' },
+  statValue:      { fontSize: 22, fontWeight: 700, color: '#11345c', marginTop: 3, fontFamily: "'Sora', sans-serif" },
   filterRow:      { display: 'flex', gap: 8, marginBottom: 12 },
-  filterBtn:      { padding: '6px 12px', border: '1px solid #d6e2f4', borderRadius: 8, background: '#fff', color: '#4a6380', cursor: 'pointer', fontSize: 12, fontWeight: 600 },
-  filterBtnActive:{ background: '#ebf2ff', border: '1px solid #1a56db', color: '#1a56db' },
+  filterBtn:      { padding: '7px 12px', border: '1px solid #d1e0ef', borderRadius: 9, background: '#f8fbff', color: '#395b77', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
+  filterBtnActive:{ background: '#eaf3ff', border: '1px solid #2f6fae', color: '#1f4f7b' },
   list:           { display: 'flex', flexDirection: 'column', gap: 10 },
-  reportCard:     { background: '#fff', border: '1px solid #e4ecf7', borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 },
+  reportCard:     { background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)', border: '1px solid #d8e6f5', borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 10px 24px rgba(3, 40, 88, 0.06)' },
   fileIcon:       { width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 },
   fileInfo:       { flex: 1, minWidth: 0 },
-  fileName:       { fontSize: 14, fontWeight: 600, color: '#0b1f3a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  fileMeta:       { fontSize: 12, color: '#7a92aa', marginTop: 3 },
-  badgePrivate:   { display: 'inline-block', marginTop: 8, padding: '3px 8px', borderRadius: 999, background: '#f2f5fa', color: '#5f738f', fontSize: 11, fontWeight: 600 },
-  badgeShared:    { display: 'inline-block', marginTop: 8, padding: '3px 8px', borderRadius: 999, background: '#edfdf4', color: '#1f7a4b', fontSize: 11, fontWeight: 600 },
+  fileName:       { fontSize: 14, fontWeight: 700, color: '#0f3150', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  fileMeta:       { fontSize: 12, color: '#66839b', marginTop: 3 },
+  badgePrivate:   { display: 'inline-block', marginTop: 8, padding: '3px 8px', borderRadius: 999, background: '#edf3fa', color: '#4f6d88', fontSize: 11, fontWeight: 700, border: '1px solid #d8e3ef' },
+  badgeShared:    { display: 'inline-block', marginTop: 8, padding: '3px 8px', borderRadius: 999, background: '#ecfbf3', color: '#176b41', fontSize: 11, fontWeight: 700, border: '1px solid #cdeedc' },
   fileActions:    { display: 'flex', gap: 8, flexShrink: 0 },
-  viewBtn:        { padding: '7px 14px', background: '#ebf2ff', color: '#1a56db', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  downloadBtn:    { padding: '7px 14px', background: '#edfdf4', color: '#1f7a4b', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  deleteBtn:      { padding: '7px 14px', background: '#fff5f5', color: '#e53e3e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+  viewBtn:        { padding: '7px 14px', background: '#eaf3ff', color: '#1e5483', borderRadius: 8, border: '1px solid #c8dcf0', cursor: 'pointer', fontSize: 13, fontWeight: 700 },
+  downloadBtn:    { padding: '7px 14px', background: '#ecfbf3', color: '#176b41', border: '1px solid #cdeedc', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 },
+  deleteBtn:      { padding: '7px 14px', background: '#fff2f2', color: '#c63c3c', border: '1px solid #f0d1d1', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 },
   empty:          { color: '#7a92aa', fontSize: 14, padding: '20px 0' },
-  emptyBox:       { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 14, border: '1px solid #e4ecf7' },
+  emptyBox:       { textAlign: 'center', padding: '60px 20px', background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)', borderRadius: 14, border: '1px solid #d8e6f5' },
   emptyIcon:      { fontSize: 48, marginBottom: 16 },
-  emptyTitle:     { fontSize: 16, fontWeight: 700, color: '#0b1f3a', marginBottom: 8 },
-  emptySub:       { fontSize: 14, color: '#7a92aa' },
+  emptyTitle:     { fontSize: 16, fontWeight: 700, color: '#0e2f4b', marginBottom: 8 },
+  emptySub:       { fontSize: 14, color: '#6b879e' },
 };
+
+const reportCss = `
+.patient-report-input {
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+.patient-report-input:focus {
+  border-color: #86afd6 !important;
+  box-shadow: 0 0 0 3px rgba(55, 125, 193, 0.16);
+  background: #ffffff;
+  outline: none;
+}
+.patient-reports-dropzone,
+.patient-report-card,
+.patient-report-action-btn,
+.patient-reports-filter-btn,
+.patient-reports-stat-card {
+  transition: transform 0.16s ease, box-shadow 0.2s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+.patient-reports-dropzone:hover {
+  border-color: #9dbbe0;
+  transform: translateY(-1px);
+}
+.patient-reports-stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(3, 40, 88, 0.1);
+}
+.patient-reports-filter-btn:hover {
+  border-color: #b8d0e7;
+  background: #f0f7ff;
+}
+.patient-report-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(3, 40, 88, 0.12);
+  border-color: #c6daee;
+}
+.patient-report-action-btn:hover {
+  transform: translateY(-1px);
+}
+@media (max-width: 980px) {
+  .patient-reports-meta-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .patient-reports-filter-row {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px) {
+  .patient-reports-share-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .patient-report-card {
+    padding: 14px !important;
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .patient-report-actions {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: 1fr;
+  }
+  .patient-report-actions button {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .patient-reports-dropzone,
+  .patient-report-card,
+  .patient-report-action-btn,
+  .patient-reports-filter-btn,
+  .patient-reports-stat-card,
+  .patient-report-input {
+    transition: none !important;
+  }
+}
+`;

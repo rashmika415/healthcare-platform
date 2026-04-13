@@ -15,10 +15,10 @@ const trustMetrics = [
 ];
 
 const navLinks = [
-  { label: 'Dashboard', href: '/dashboard', authRequired: true },
+  { label: 'Home', href: '/' },
   { label: 'Appointments', href: '/appointments' },
   { label: 'Telemedicine', href: '/#telemedicine' },
-  { label: 'Messages', href: '/#messages' },
+  { label: 'Contact', href: '/#messages' },
   { label: 'Health Records', href: '/#records' }
 ];
 
@@ -27,11 +27,7 @@ const NexusHealth = () => {
   const { user } = useAuth();
 
   const getLink = (link) => {
-    if (link.label === 'Dashboard' && user) {
-      if (user.role === 'patient') return '/patient/dashboard';
-      if (user.role === 'doctor') return '/doctor/dashboard';
-      if (user.role === 'admin') return '/admin/dashboard';
-    }
+    if (link.label === 'Home') return '/';
     if (link.label === 'Appointments' && user) {
       if (user.role === 'patient') return '/appointments';
       if (user.role === 'doctor') return '/doctor/appointments';

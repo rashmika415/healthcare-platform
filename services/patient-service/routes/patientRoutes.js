@@ -14,6 +14,7 @@ router.put('/profile',   c.updateProfile);   // update my profile
 // ── Read-only data routes ─────────────────────────────
 router.get('/prescriptions', c.getPrescriptions);  // view prescriptions
 router.get('/history',       c.getMedicalHistory); // view history
+router.get('/medical-history', c.getMedicalHistoryOverview); // aggregated timeline
 
 // ── Internal routes (called by other services) ────────
 // These routes are NOT meant to be called by the frontend

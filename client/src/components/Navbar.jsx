@@ -49,7 +49,7 @@ export default function Navbar() {
         <div style={styles.brand}>
           <Link to="/" style={styles.brandLink}>
             <span style={styles.brandIcon}>⚕️</span>
-            MediConnect
+            Nexus Health
           </Link>
         </div>
 
