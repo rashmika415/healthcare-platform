@@ -15,6 +15,7 @@ const trustMetrics = [
 ];
 
 const navLinks = [
+  { label: 'Dashboard', href: '/dashboard', authRequired: true },
   { label: 'Appointments', href: '/appointments' },
   { label: 'Telemedicine', href: '/#telemedicine' },
   { label: 'Messages', href: '/#messages' },
@@ -26,8 +27,13 @@ const NexusHealth = () => {
   const { user } = useAuth();
 
   const getLink = (link) => {
+    if (link.label === 'Dashboard' && user) {
+      if (user.role === 'patient') return '/patient/dashboard';
+      if (user.role === 'doctor') return '/doctor/dashboard';
+      if (user.role === 'admin') return '/admin/dashboard';
+    }
     if (link.label === 'Appointments' && user) {
-      if (user.role === 'patient') return '/patient/appointments';
+      if (user.role === 'patient') return '/appointments';
       if (user.role === 'doctor') return '/doctor/appointments';
       if (user.role === 'admin') return '/admin/dashboard';
     }
@@ -36,6 +42,7 @@ const NexusHealth = () => {
 
   const getProfilePathByRole = (role) => {
     if (role === 'patient') return '/patient/profile';
+    if (role === 'doctor') return '/doctor/dashboard';
     if (role === 'admin') return '/admin/dashboard';
     return '/';
   };
@@ -73,7 +80,7 @@ const NexusHealth = () => {
         <div className="flex justify-between items-center h-20 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto">
           <div className="text-2xl font-headline font-bold tracking-tighter text-blue-950">Nexus Health</div>
           <div className="hidden md:flex items-center gap-10">
-            {navLinks.map((link, index) => {
+            {navLinks.filter(link => !link.authRequired || user).map((link, index) => {
               const targetUrl = getLink(link);
               const isRoute = targetUrl.startsWith('/');
 
@@ -141,7 +148,7 @@ const NexusHealth = () => {
         </div>
         <div className={`md:hidden px-4 sm:px-6 pb-4 transition-all duration-300 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
           <div className="rounded-2xl border border-blue-100 bg-white/95 shadow-lg p-4 space-y-3">
-            {navLinks.map((link) => {
+            {navLinks.filter(link => !link.authRequired || user).map((link) => {
               const targetUrl = getLink(link);
               const isRoute = targetUrl.startsWith('/');
 
