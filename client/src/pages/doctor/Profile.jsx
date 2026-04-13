@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../../services/api";
 import Sidebar from "../../components/doctor/Sidebar";
 import Topbar from "../../components/doctor/Topbar";
-import { User, Briefcase, Building2, FileText, Mail, CheckCircle, XCircle } from "lucide-react";
+import { User, Briefcase, Building2, FileText, Mail, CheckCircle, XCircle, BadgeDollarSign } from "lucide-react";
 
 export default function DoctorProfile() {
   const [form, setForm] = useState({
@@ -12,6 +12,7 @@ export default function DoctorProfile() {
     experience: "",
     hospital: "",
     bio: "",
+    consultationFee: "",
   });
   const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,6 +58,7 @@ export default function DoctorProfile() {
           experience: d.experience || "",
           hospital: d.hospital || "",
           bio: d.bio || "",
+          consultationFee: d.consultationFee ?? "",
         });
         setIsVerified(d.isVerified || false);
       } catch (err) {
@@ -83,7 +85,7 @@ export default function DoctorProfile() {
   };
 
   const handleSubmit = async () => {
-    if (!form.specialization || !form.experience || !form.hospital || !form.bio) {
+    if (!form.specialization || !form.experience || !form.hospital || !form.bio || form.consultationFee === "") {
       setMessage({ type: "error", text: "Please fill all required fields." });
       return;
     }
@@ -97,6 +99,7 @@ export default function DoctorProfile() {
         experience: Number(form.experience),
         hospital: form.hospital,
         bio: form.bio,
+        consultationFee: Number(form.consultationFee),
       });
       console.log("✅ Profile saved:", res.data);
       setMessage({ type: "success", text: "Profile saved successfully!" });
@@ -160,6 +163,11 @@ export default function DoctorProfile() {
                     {form.experience && (
                       <span className="text-xs text-gray-500 bg-gray-50 px-2.5 py-0.5 rounded-full font-medium border border-gray-100">
                         {form.experience} yrs experience
+                      </span>
+                    )}
+                    {form.consultationFee !== "" && (
+                      <span className="text-xs text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full font-medium border border-emerald-100">
+                        Fee: {Number(form.consultationFee).toLocaleString()} 
                       </span>
                     )}
                   </div>
@@ -254,6 +262,22 @@ export default function DoctorProfile() {
                     value={form.hospital}
                     onChange={handleChange}
                     placeholder="e.g. City General Hospital"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-gray-500 mb-1.5 flex items-center gap-1">
+                    <BadgeDollarSign size={11} /> Consultation Fee
+                    <span className="text-red-400 ml-0.5">*</span>
+                  </label>
+                  <input
+                    name="consultationFee"
+                    type="number"
+                    min="0"
+                    value={form.consultationFee}
+                    onChange={handleChange}
+                    placeholder="e.g. 500"
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                   />
                 </div>

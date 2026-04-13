@@ -18,10 +18,10 @@ exports.upsertProfile = async (req, res) => {
       return res.status(403).json({ error: 'Only doctors allowed' });
     }
 
-    const { specialization, experience, hospital, bio } = req.body || {};
+    const { specialization, experience, hospital, bio, consultationFee } = req.body || {};
 
-    if (!specialization || experience === undefined || !hospital || !bio) {
-      return res.status(400).json({ error: 'All fields are required: specialization, experience, hospital, bio' });
+    if (!specialization || experience === undefined || !hospital || !bio || consultationFee === undefined) {
+      return res.status(400).json({ error: 'All fields are required: specialization, experience, hospital, bio, consultationFee' });
     }
 
     const profileData = {
@@ -32,8 +32,7 @@ exports.upsertProfile = async (req, res) => {
       experience: Number(experience),
       hospital,
       bio,
-      // Sync with gateway User.isVerified (e.g. admin verified before/after profile exists)
-      isVerified: req.user.isVerified === true,
+      consultationFee: Number(consultationFee),
     };
 
     const isNew = !(await Doctor.findOne({ userId: req.user.id }));
@@ -358,15 +357,78 @@ exports.getDoctorById = async (req, res) => {
   }
 };
 
-exports.getAllVerifiedDoctorsForPatients = async (req, res) => {
+/**
+ * 🌍 Public: Search verified doctors (for appointment booking)
+ * GET /public/doctors?name=&specialization=&hospital=
+ */
+exports.publicSearchDoctors = async (req, res) => {
   try {
-    const doctors = await Doctor.find({ isVerified: true }).select(
-      "_id userId name specialization experience hospital email"
+    const { name, specialization, hospital } = req.query || {};
+
+    const filter = { isVerified: true };
+
+    if (name && String(name).trim()) {
+      filter.name = { $regex: String(name).trim(), $options: 'i' };
+    }
+    if (specialization && String(specialization).trim()) {
+      filter.specialization = String(specialization).trim();
+    }
+    if (hospital && String(hospital).trim()) {
+      filter.hospital = String(hospital).trim();
+    }
+
+    const doctors = await Doctor.find(filter)
+      .select('name specialization hospital experience bio consultationFee isVerified userId')
+      .sort({ name: 1 });
+
+    return res.status(200).json({ doctors });
+  } catch (err) {
+    console.error('Error in publicSearchDoctors:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * 🌍 Public: Filters for appointment search dropdowns
+ * GET /public/filters
+ */
+exports.publicFilters = async (req, res) => {
+  try {
+    const [specializations, hospitals, names] = await Promise.all([
+      Doctor.distinct('specialization', { isVerified: true }),
+      Doctor.distinct('hospital', { isVerified: true }),
+      Doctor.distinct('name', { isVerified: true }),
+    ]);
+
+    return res.status(200).json({
+      specializations: (specializations || []).filter(Boolean).sort(),
+      hospitals: (hospitals || []).filter(Boolean).sort(),
+      doctorNames: (names || []).filter(Boolean).sort(),
+    });
+  } catch (err) {
+    console.error('Error in publicFilters:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * 🌍 Public: Get verified doctor profile
+ * GET /public/doctors/:doctorId
+ */
+exports.publicGetDoctorProfile = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const doctor = await Doctor.findById(doctorId).select(
+      'name specialization hospital experience bio consultationFee isVerified userId'
     );
 
-    res.status(200).json(doctors);
+    if (!doctor || !doctor.isVerified) {
+      return res.status(404).json({ error: 'Doctor not found' });
+    }
+
+    return res.status(200).json({ doctor });
   } catch (err) {
-    console.error("Error in getAllVerifiedDoctorsForPatients:", err);
-    res.status(500).json({ error: err.message });
+    console.error('Error in publicGetDoctorProfile:', err);
+    return res.status(500).json({ error: err.message });
   }
 };

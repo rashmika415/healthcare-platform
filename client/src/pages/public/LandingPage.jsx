@@ -15,7 +15,7 @@ const trustMetrics = [
 ];
 
 const navLinks = [
-  { label: 'Appointments', href: '/#appointments' },
+  { label: 'Appointments', href: '/appointments' },
   { label: 'Telemedicine', href: '/#telemedicine' },
   { label: 'Messages', href: '/#messages' },
   { label: 'Health Records', href: '/#records' }
