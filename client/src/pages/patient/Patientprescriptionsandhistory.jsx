@@ -41,7 +41,7 @@ export default function PatientPrescriptions() {
                   <div style={s.docAvatar}>{p.doctorName?.charAt(0) || 'D'}</div>
                   <div style={s.cardInfo}>
                     <div style={s.docName}>Dr. {p.doctorName}</div>
-                    <div style={s.cardDate}>{new Date(p.issuedAt).toLocaleDateString()}</div>
+                    <div style={s.cardDate}>{new Date(p.createdAt || p.issuedAt).toLocaleDateString()}</div>
                   </div>
                   <div style={s.medCount}>{p.medicines?.length} med{p.medicines?.length !== 1 ? 's' : ''}</div>
                 </div>
@@ -59,7 +59,7 @@ export default function PatientPrescriptions() {
                 <div style={s.detailAvatar}>{prescriptions[selected].doctorName?.charAt(0)}</div>
                 <div>
                   <div style={s.detailDoc}>Dr. {prescriptions[selected].doctorName}</div>
-                  <div style={s.detailDate}>{new Date(prescriptions[selected].issuedAt).toLocaleDateString()}</div>
+                  <div style={s.detailDate}>{new Date(prescriptions[selected].createdAt || prescriptions[selected].issuedAt).toLocaleDateString()}</div>
                 </div>
               </div>
 

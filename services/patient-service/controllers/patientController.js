@@ -1,5 +1,8 @@
 const Patient = require('../models/patientModel');
 const { cloudinary } = require('../config/cloudinaryConfig');
+const axios = require('axios');
+
+const doctorServiceBaseUrl = (process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002').replace(/\/$/, '');
 
 // ─────────────────────────────────────────────────────
 // POST /patients/profile
@@ -107,22 +110,44 @@ exports.updateProfile = async (req, res) => {
 // ─────────────────────────────────────────────────────
 exports.getPrescriptions = async (req, res) => {
   try {
-    const patient = await Patient
-      .findOne({ userId: req.user.id })
-      .select('prescriptions'); // only return prescriptions field
+    const upstreamHeaders = {
+      'x-user-id': req.headers['x-user-id'] || req.user.id,
+      'x-user-role': req.headers['x-user-role'] || req.user.role,
+      'x-user-email': req.headers['x-user-email'] || req.user.email,
+      'x-user-name': req.headers['x-user-name'] || req.user.name
+    };
 
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
+    if (req.headers['x-user-verified'] !== undefined) {
+      upstreamHeaders['x-user-verified'] = req.headers['x-user-verified'];
     }
 
-    res.status(200).json({
-      count: patient.prescriptions.length,
-      prescriptions: patient.prescriptions
-    });
+    const response = await axios.get(
+      `${doctorServiceBaseUrl}/prescriptions/patient/${encodeURIComponent(req.user.id)}`,
+      {
+        headers: upstreamHeaders,
+        params: {
+          status: req.query.status
+        },
+        timeout: 10000
+      }
+    );
+
+    res.status(200).json(response.data);
 
   } catch (err) {
     console.error('getPrescriptions error:', err.message);
-    res.status(500).json({ error: err.message });
+
+    if (err.response) {
+      return res.status(err.response.status).json(
+        err.response.data || { error: 'Failed to fetch prescriptions from doctor service' }
+      );
+    }
+
+    if (err.code === 'ECONNABORTED') {
+      return res.status(504).json({ error: 'Doctor service timeout while fetching prescriptions' });
+    }
+
+    res.status(503).json({ error: 'Doctor service unavailable' });
   }
 };
 
