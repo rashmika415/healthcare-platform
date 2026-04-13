@@ -37,8 +37,34 @@ const reportSchema = new mongoose.Schema({
   filename:   { type: String, required: true }, // original file name
   url:        { type: String, required: true }, // Cloudinary URL to view/download
   publicId:   { type: String, required: true }, // Cloudinary ID — needed to delete
+  resourceType: { type: String, enum: ['image', 'raw'], default: 'raw' },
   fileType:   { type: String },                 // pdf, image/jpeg etc
+  format:     { type: String },                 // pdf, jpg, png
   size:       { type: Number },                 // file size in bytes
+  reportType: {
+    type: String,
+    enum: ['lab', 'radiology', 'prescription-scan', 'discharge-summary', 'other'],
+    required: true
+  },
+  title:      { type: String, required: true, trim: true },
+  description:{ type: String, trim: true },
+  patientUserId: { type: String, required: true },
+  doctorUserId:  { type: String },
+  appointmentId: { type: String },
+  hospitalOrLabName: { type: String, trim: true },
+  reportDate:  { type: Date, required: true },
+  isCritical:  { type: Boolean, default: false },
+  tags:        [{ type: String, trim: true }],
+  sharedWithDoctors: [{ type: String }],
+  status: {
+    type: String,
+    enum: ['active', 'archived', 'deleted'],
+    default: 'active'
+  },
+  createdBy:   { type: String },
+  updatedBy:   { type: String },
+  deletedBy:   { type: String },
+  deletedAt:   { type: Date },
   uploadedAt: { type: Date, default: Date.now }
 });
 
@@ -65,6 +91,10 @@ const patientSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+patientSchema.index({ userId: 1, 'medicalReports.reportDate': -1 });
+patientSchema.index({ userId: 1, 'medicalReports.reportType': 1 });
+patientSchema.index({ userId: 1, 'medicalReports.status': 1 });
 
 
 module.exports = mongoose.model('Patient', patientSchema);

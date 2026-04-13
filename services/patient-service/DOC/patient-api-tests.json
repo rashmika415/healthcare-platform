@@ -160,7 +160,7 @@
       "name": "3 - MEDICAL REPORTS",
       "item": [
         {
-          "name": "Upload Report (PDF or Image)",
+          "name": "Upload Report (PDF or Image + Metadata)",
           "request": {
             "method": "POST",
             "header": [
@@ -169,6 +169,41 @@
             "body": {
               "mode": "formdata",
               "formdata": [
+                {
+                  "key": "reportType",
+                  "type": "text",
+                  "value": "lab"
+                },
+                {
+                  "key": "title",
+                  "type": "text",
+                  "value": "CBC Blood Test"
+                },
+                {
+                  "key": "reportDate",
+                  "type": "text",
+                  "value": "2026-04-12"
+                },
+                {
+                  "key": "description",
+                  "type": "text",
+                  "value": "Annual blood profile result"
+                },
+                {
+                  "key": "hospitalOrLabName",
+                  "type": "text",
+                  "value": "City Lab"
+                },
+                {
+                  "key": "tags",
+                  "type": "text",
+                  "value": "blood,annual"
+                },
+                {
+                  "key": "isCritical",
+                  "type": "text",
+                  "value": "false"
+                },
                 {
                   "key": "report",
                   "type": "file",
@@ -185,16 +220,122 @@
           }
         },
         {
-          "name": "Get All Reports",
+          "name": "Get All Reports (Filters + Pagination)",
           "request": {
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{token}}" }
             ],
             "url": {
-              "raw": "{{baseUrl}}/patients/reports",
+              "raw": "{{baseUrl}}/patients/reports?page=1&limit=10&type=lab&status=active&search=blood",
               "host": ["{{baseUrl}}"],
-              "path": ["patients", "reports"]
+              "path": ["patients", "reports"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "type", "value": "lab" },
+                { "key": "status", "value": "active" },
+                { "key": "search", "value": "blood" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Report By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE"]
+            }
+          }
+        },
+        {
+          "name": "Update Report Metadata",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"CBC Blood Test (Updated)\",\n  \"description\": \"Updated after doctor review\",\n  \"isCritical\": true,\n  \"tags\": [\"blood\", \"follow-up\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE"]
+            }
+          }
+        },
+        {
+          "name": "Share Report With Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorUserId\": \"PASTE_DOCTOR_USER_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE/share",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE", "share"]
+            }
+          }
+        },
+        {
+          "name": "Unshare Report With Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorUserId\": \"PASTE_DOCTOR_USER_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE/unshare",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE", "unshare"]
+            }
+          }
+        },
+        {
+          "name": "Archive Report",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE/archive",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE", "archive"]
+            }
+          }
+        },
+        {
+          "name": "Get Signed Download Url",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/download/PASTE_REPORT_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "download", "PASTE_REPORT_ID_HERE"]
             }
           }
         },

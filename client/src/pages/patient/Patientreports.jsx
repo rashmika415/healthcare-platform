@@ -1,6 +1,11 @@
 // client/src/pages/patient/PatientReports.jsx
 import { useEffect, useState, useRef } from 'react';
-import api from '../../services/api';
+import {
+  deletePatientReport,
+  getPatientReportDownloadUrl,
+  getPatientReports,
+  uploadPatientReport
+} from '../../services/patientApi';
 import PatientLayout from './Patientlayout ';
 
 export default function PatientReports() {
@@ -13,8 +18,8 @@ export default function PatientReports() {
   const fileRef = useRef();
 
   const fetchReports = () => {
-    api.get('/patients/reports')
-      .then(r  => setReports(r.data.reports || []))
+    getPatientReports({ page: 1, limit: 100, status: 'active' })
+      .then((data) => setReports(data.reports || []))
       .catch(() => setError('Failed to load reports'))
       .finally(() => setLoading(false));
   };
@@ -31,13 +36,13 @@ export default function PatientReports() {
       setError('File size must be under 10MB'); return;
     }
 
-    const fd = new FormData();
-    fd.append('report', file);
     setUploading(true); setError('');
 
     try {
-      await api.post('/patients/reports', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      await uploadPatientReport(file, {
+        reportType: 'other',
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        reportDate: new Date().toISOString().slice(0, 10)
       });
       setSuccess('Report uploaded successfully!');
       setTimeout(() => setSuccess(''), 3000);
@@ -50,12 +55,29 @@ export default function PatientReports() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this report? This cannot be undone.')) return;
     try {
-      await api.delete(`/patients/reports/${id}`);
+      await deletePatientReport(id);
       setSuccess('Report deleted.');
       setTimeout(() => setSuccess(''), 2000);
       fetchReports();
     } catch {
       setError('Failed to delete report');
+    }
+  };
+
+  const handleOpen = async (report) => {
+    try {
+      const result = await getPatientReportDownloadUrl(report._id);
+      if (result?.downloadUrl) {
+        window.open(result.downloadUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      if (report.url) window.open(report.url, '_blank', 'noopener,noreferrer');
+    } catch {
+      if (report.url) {
+        window.open(report.url, '_blank', 'noopener,noreferrer');
+      } else {
+        setError('Failed to open report');
+      }
     }
   };
 
@@ -127,9 +149,9 @@ export default function PatientReports() {
                   </div>
                 </div>
                 <div style={s.fileActions}>
-                  <a href={r.url} target="_blank" rel="noreferrer" style={s.viewBtn}>
-                    View ↗
-                  </a>
+                  <button onClick={() => handleOpen(r)} style={s.viewBtn}>
+                    Open ↗
+                  </button>
                   <button onClick={() => handleDelete(r._id)} style={s.deleteBtn}>
                     Delete
                   </button>
@@ -161,7 +183,7 @@ const s = {
   fileName:       { fontSize: 14, fontWeight: 600, color: '#0b1f3a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   fileMeta:       { fontSize: 12, color: '#7a92aa', marginTop: 3 },
   fileActions:    { display: 'flex', gap: 8, flexShrink: 0 },
-  viewBtn:        { padding: '7px 14px', background: '#ebf2ff', color: '#1a56db', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 600 },
+  viewBtn:        { padding: '7px 14px', background: '#ebf2ff', color: '#1a56db', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
   deleteBtn:      { padding: '7px 14px', background: '#fff5f5', color: '#e53e3e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
   empty:          { color: '#7a92aa', fontSize: 14, padding: '20px 0' },
   emptyBox:       { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 14, border: '1px solid #e4ecf7' },
