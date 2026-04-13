@@ -6,7 +6,7 @@ import PrescriptionForm from "../../components/doctor/PrescriptionForm";
 import {
   Plus, Pill, User, Calendar, FileText,
   ChevronDown, ChevronUp, Trash2, CheckCircle,
-  Clock, XCircle, Search, Filter,
+  Clock, XCircle, Search, Filter, Edit3,
 } from "lucide-react";
 
 const STATUS_CONFIG = {
@@ -36,14 +36,26 @@ function writeRxCache(userId, list) {
   }
 }
 
+function markAsCached(list) {
+  return (list || [])
+    .filter((p) => p?._id)
+    .map((p) => ({ ...p, __fromServer: false }));
+}
+
 function mergePrescriptionsById(server, cached) {
   const map = new Map();
+
   for (const p of cached || []) {
-    if (p?._id) map.set(String(p._id), p);
+    if (!p?._id) continue;
+    map.set(String(p._id), { ...p, __fromServer: false });
   }
+
   for (const p of server || []) {
-    if (p?._id) map.set(String(p._id), p);
+    if (!p?._id) continue;
+    // Server wins, and marks the record as real (editable/deletable).
+    map.set(String(p._id), { ...p, __fromServer: true });
   }
+
   return Array.from(map.values()).sort(
     (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
   );
@@ -56,6 +68,7 @@ export default function DoctorPrescriptions() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [showForm,      setShowForm]      = useState(false);
+  const [editing,       setEditing]       = useState(null);
   const [expanded,      setExpanded]      = useState(null);
   const [filter,        setFilter]        = useState("all");
   const [search,        setSearch]        = useState("");
@@ -67,7 +80,7 @@ export default function DoctorPrescriptions() {
   }, [userId]);
 
   const fetchPrescriptions = async () => {
-    const cached = readRxCache(userId);
+    const cached = markAsCached(readRxCache(userId));
     try {
       setLoading(true);
       const res = await api.get("/doctor/prescriptions", {
@@ -75,9 +88,6 @@ export default function DoctorPrescriptions() {
       });
       const server = res.data.prescriptions || [];
       let merged = mergePrescriptionsById(server, cached);
-      if (server.length === 0 && cached.length > 0) {
-        merged = cached;
-      }
       setPrescriptions(merged);
       if (userId && merged.length) writeRxCache(userId, merged);
     } catch (err) {
@@ -102,6 +112,27 @@ export default function DoctorPrescriptions() {
     }
   };
 
+  const handleUpdate = async (id, payload) => {
+    try {
+      await api.put(`/doctor/prescriptions/${id}`, payload);
+      await fetchPrescriptions();
+      setEditing(null);
+      setMessage({ type: "success", text: "Prescription updated" });
+      setTimeout(() => setMessage(null), 2500);
+    } catch (err) {
+      console.error("Update prescription failed:", err);
+      const backendError = err.response?.data?.error || err.response?.data?.message;
+      const status = err.response?.status;
+      if (status === 404) {
+        // If server doesn't have it anymore, remove from UI + cache.
+        setPrescriptions((prev) => prev.filter((p) => String(p?._id) !== String(id)));
+        writeRxCache(userId, readRxCache(userId).filter((p) => String(p?._id) !== String(id)));
+      }
+      setMessage({ type: "error", text: backendError || `Failed to update (${status || "network"})` });
+      setTimeout(() => setMessage(null), 2500);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this prescription?")) return;
     try {
@@ -109,8 +140,16 @@ export default function DoctorPrescriptions() {
       await fetchPrescriptions();
       setMessage({ type: "success", text: "Prescription deleted" });
       setTimeout(() => setMessage(null), 2500);
-    } catch {
-      setMessage({ type: "error", text: "Failed to delete" });
+    } catch (err) {
+      console.error("Delete prescription failed:", err);
+      const backendError = err.response?.data?.error || err.response?.data?.message;
+      const status = err.response?.status;
+      if (status === 404) {
+        // Remove stale cached item so user doesn't get stuck.
+        setPrescriptions((prev) => prev.filter((p) => String(p?._id) !== String(id)));
+        writeRxCache(userId, readRxCache(userId).filter((p) => String(p?._id) !== String(id)));
+      }
+      setMessage({ type: "error", text: backendError || `Failed to delete (${status || "network"})` });
       setTimeout(() => setMessage(null), 2500);
     }
   };
@@ -261,15 +300,16 @@ export default function DoctorPrescriptions() {
         ) : (
           <div className="space-y-3">
             {filtered.map(p => {
+              const id = p?._id != null ? String(p._id) : "";
               const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.active;
-              const isExpanded = expanded === p._id;
+              const isExpanded = expanded != null && String(expanded) === id;
 
               return (
-                <div key={p._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div key={id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                   {/* Card Header */}
                   <div
                     className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-50 transition"
-                    onClick={() => setExpanded(isExpanded ? null : p._id)}
+                    onClick={() => setExpanded(isExpanded ? null : id)}
                   >
                     <div className="flex items-center gap-4">
                       {/* Avatar */}
@@ -314,13 +354,13 @@ export default function DoctorPrescriptions() {
                       {p.status === "active" && (
                         <>
                           <button
-                            onClick={e => { e.stopPropagation(); handleStatusChange(p._id, "completed"); }}
+                            onClick={e => { e.stopPropagation(); handleStatusChange(id, "completed"); }}
                             className="text-xs px-2.5 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg font-semibold hover:bg-emerald-100 transition"
                           >
                             Complete
                           </button>
                           <button
-                            onClick={e => { e.stopPropagation(); handleStatusChange(p._id, "cancelled"); }}
+                            onClick={e => { e.stopPropagation(); handleStatusChange(id, "cancelled"); }}
                             className="text-xs px-2.5 py-1.5 bg-rose-50 text-rose-500 rounded-lg font-semibold hover:bg-rose-100 transition"
                           >
                             Cancel
@@ -328,10 +368,34 @@ export default function DoctorPrescriptions() {
                         </>
                       )}
                       <button
-                        onClick={e => { e.stopPropagation(); handleDelete(p._id); }}
+                        onClick={e => { e.stopPropagation(); handleDelete(id); }}
                         className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-50 flex items-center justify-center transition"
+                        title="Delete"
                       >
                         <Trash2 size={13} className="text-slate-400 hover:text-rose-500" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpanded(id);
+                          setEditing({
+                            _id: id,
+                            patientEmail: p.patientEmail || "",
+                            patientName: p.patientName || "",
+                            diagnosis: p.diagnosis || "",
+                            instructions: p.instructions || "",
+                            medicines: Array.isArray(p.medicines) ? p.medicines.map(m => ({
+                              name: m?.name || "",
+                              dosage: m?.dosage || "",
+                              duration: m?.duration || "",
+                              frequency: m?.frequency || "Once daily",
+                            })) : [{ name: "", dosage: "", duration: "", frequency: "Once daily" }],
+                          });
+                        }}
+                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-50 flex items-center justify-center transition"
+                        title="Edit"
+                      >
+                        <Edit3 size={13} className="text-slate-400 hover:text-blue-600" />
                       </button>
                       {isExpanded
                         ? <ChevronUp size={16} className="text-slate-400" />
@@ -343,6 +407,141 @@ export default function DoctorPrescriptions() {
                   {/* Expanded Details */}
                   {isExpanded && (
                     <div className="border-t border-slate-100 px-5 py-4 bg-slate-50">
+                      {/* Edit Form */}
+                      {editing?._id != null && String(editing._id) === id && (
+                        <div className="bg-white border border-slate-100 rounded-2xl p-4 mb-4">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                            Edit Prescription
+                          </p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                            <div>
+                              <label className="text-xs font-semibold text-slate-500 mb-1 block">Patient Email</label>
+                              <input
+                                value={editing.patientEmail}
+                                onChange={(e) => setEditing((prev) => ({ ...prev, patientEmail: e.target.value }))}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                placeholder="patient@example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold text-slate-500 mb-1 block">Patient Name</label>
+                              <input
+                                value={editing.patientName}
+                                onChange={(e) => setEditing((prev) => ({ ...prev, patientName: e.target.value }))}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                placeholder="Patient name"
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="text-xs font-semibold text-slate-500 mb-1 block">Diagnosis</label>
+                              <input
+                                value={editing.diagnosis}
+                                onChange={(e) => setEditing((prev) => ({ ...prev, diagnosis: e.target.value }))}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                placeholder="Diagnosis"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 mb-4">
+                            <label className="text-xs font-semibold text-slate-500 mb-1 block">Medicines</label>
+                            {(editing.medicines || []).map((m, idx) => (
+                              <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                <input
+                                  value={m.name}
+                                  onChange={(e) => setEditing((prev) => {
+                                    const next = { ...prev };
+                                    next.medicines = [...next.medicines];
+                                    next.medicines[idx] = { ...next.medicines[idx], name: e.target.value };
+                                    return next;
+                                  })}
+                                  className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                  placeholder="Name"
+                                />
+                                <input
+                                  value={m.dosage}
+                                  onChange={(e) => setEditing((prev) => {
+                                    const next = { ...prev };
+                                    next.medicines = [...next.medicines];
+                                    next.medicines[idx] = { ...next.medicines[idx], dosage: e.target.value };
+                                    return next;
+                                  })}
+                                  className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                  placeholder="Dosage"
+                                />
+                                <input
+                                  value={m.duration}
+                                  onChange={(e) => setEditing((prev) => {
+                                    const next = { ...prev };
+                                    next.medicines = [...next.medicines];
+                                    next.medicines[idx] = { ...next.medicines[idx], duration: e.target.value };
+                                    return next;
+                                  })}
+                                  className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                  placeholder="Duration"
+                                />
+                                <input
+                                  value={m.frequency}
+                                  onChange={(e) => setEditing((prev) => {
+                                    const next = { ...prev };
+                                    next.medicines = [...next.medicines];
+                                    next.medicines[idx] = { ...next.medicines[idx], frequency: e.target.value };
+                                    return next;
+                                  })}
+                                  className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                  placeholder="Frequency"
+                                />
+                              </div>
+                            ))}
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditing((prev) => ({
+                                  ...prev,
+                                  medicines: [...(prev.medicines || []), { name: "", dosage: "", duration: "", frequency: "Once daily" }],
+                                }))}
+                                className="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-semibold hover:bg-blue-100 transition"
+                              >
+                                Add medicine
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditing(null)}
+                                className="text-xs px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg font-semibold hover:bg-slate-200 transition"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdate(p._id, {
+                                  patientEmail: editing.patientEmail,
+                                  patientName: editing.patientName,
+                                  diagnosis: editing.diagnosis,
+                                  instructions: editing.instructions,
+                                  medicines: editing.medicines,
+                                })}
+                                className="text-xs px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-semibold hover:bg-emerald-100 transition"
+                              >
+                                Save changes
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-semibold text-slate-500 mb-1 block">Instructions</label>
+                            <textarea
+                              rows={3}
+                              value={editing.instructions}
+                              onChange={(e) => setEditing((prev) => ({ ...prev, instructions: e.target.value }))}
+                              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition"
+                              placeholder="Instructions"
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {/* Medicines */}
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                         Medicines

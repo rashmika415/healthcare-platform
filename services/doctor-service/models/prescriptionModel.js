@@ -10,7 +10,9 @@ const medicineSchema = new mongoose.Schema({
 const prescriptionSchema = new mongoose.Schema({
   doctorUserId:   { type: String, required: true },
   doctorName:     { type: String },
-  patientUserId:  { type: String, required: true },
+  // Optional: doctors create prescriptions by patient email (patient id not required in doctor UI).
+  patientUserId:  { type: String, required: false },
+  patientEmail:   { type: String, required: true, lowercase: true, trim: true },
   patientName:    { type: String },
   medicines:      { type: [medicineSchema], required: true },
   instructions:   { type: String, default: "" },

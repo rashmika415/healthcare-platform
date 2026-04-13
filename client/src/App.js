@@ -2,6 +2,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import DashboardRedirect from './components/DashboardRedirect';
+import InitialHomeRedirect from './components/InitialHomeRedirect';
 
 // Public pages
 import LandingPage  from './pages/public/LandingPage';
@@ -46,12 +48,14 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <InitialHomeRedirect />
         <Routes>
 
           {/* ── Public ───────────────────────────── */}
           <Route path="/"         element={<LandingPage />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/dashboard" element={<DashboardRedirect />} />
           <Route path="/appointments" element={<AppointmentSearch />} />
           <Route path="/appointments/results" element={<AppointmentResults />} />
           <Route path="/doctors/:doctorId" element={<DoctorPublicProfile />} />
@@ -74,7 +78,7 @@ export default function App() {
   <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
 } />
 
-          ── Patient ────────────────────────────
+          {/* ── Patient ──────────────────────────── */}
           {/* ── Patient routes ── */}
 <Route path="/patient/setup" element={
   <PrivateRoute role="patient"><PatientSetup /></PrivateRoute>

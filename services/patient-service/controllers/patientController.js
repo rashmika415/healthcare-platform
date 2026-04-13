@@ -1072,3 +1072,29 @@ exports.deleteReport = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// // Get All Patient Emails // // //
+// For doctor prescription form dropdown
+exports.getAllPatientEmails = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    if (req.user.role !== 'doctor') return res.status(403).json({ error: 'Only doctors allowed' });
+
+    const patients = await Patient.find({})
+      .select('email name')
+      .sort({ name: 1 });
+
+    const patientEmails = patients.map(patient => ({
+      email: patient.email,
+      name: patient.name
+    }));
+
+    return res.status(200).json({
+      total: patientEmails.length,
+      patients: patientEmails
+    });
+  } catch (err) {
+    console.error('getAllPatientEmails error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
