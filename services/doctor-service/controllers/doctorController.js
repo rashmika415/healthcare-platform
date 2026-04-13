@@ -378,7 +378,7 @@ exports.publicSearchDoctors = async (req, res) => {
     }
 
     const doctors = await Doctor.find(filter)
-      .select('name specialization hospital experience bio consultationFee isVerified userId')
+      .select('name email specialization hospital experience bio consultationFee isVerified userId')
       .sort({ name: 1 });
 
     return res.status(200).json({ doctors });
@@ -429,6 +429,31 @@ exports.publicGetDoctorProfile = async (req, res) => {
     return res.status(200).json({ doctor });
   } catch (err) {
     console.error('Error in publicGetDoctorProfile:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * 🔒 Internal: Resolve verified doctor by email
+ * GET /internal/by-email/:email
+ */
+exports.internalGetDoctorByEmail = async (req, res) => {
+  try {
+    const email = String(req.params.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: 'email is required' });
+    }
+
+    const doctor = await Doctor.findOne({ email })
+      .select('userId name email specialization hospital isVerified');
+
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found for this email' });
+    }
+
+    return res.status(200).json({ doctor });
+  } catch (err) {
+    console.error('Error in internalGetDoctorByEmail:', err);
     return res.status(500).json({ error: err.message });
   }
 };

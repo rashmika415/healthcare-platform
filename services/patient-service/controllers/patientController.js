@@ -344,32 +344,726 @@ exports.getReports = async (req, res) => {
 };
 
 
+const REPORT_TYPES = new Set(['lab', 'radiology', 'prescription-scan', 'discharge-summary', 'other']);
+const REPORT_STATUSES = new Set(['active', 'archived', 'deleted']);
+
+const parseBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+};
+
+const parseArray = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  return String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const parseDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const inferFormatFromFilename = (filename = '') => {
+  const parts = String(filename).split('.');
+  return parts.length > 1 ? String(parts.pop() || '').toLowerCase() : '';
+};
+
+const resolveReportVisibility = (report) => {
+  if (report?.visibility === 'private' || report?.visibility === 'shared') {
+    return report.visibility;
+  }
+  return Array.isArray(report?.sharedWithDoctors) && report.sharedWithDoctors.length > 0 ? 'shared' : 'private';
+};
+
+const withResolvedVisibility = (report) => {
+  if (!report) return report;
+  const normalized = typeof report.toObject === 'function' ? report.toObject() : { ...report };
+  normalized.visibility = resolveReportVisibility(report);
+  return normalized;
+};
+
+const resolveDoctorByEmail = async (req, doctorEmail) => {
+  const email = String(doctorEmail || '').trim().toLowerCase();
+  if (!email) return null;
+
+  const upstreamHeaders = {
+    'x-user-id': req.headers['x-user-id'] || req.user.id,
+    'x-user-role': req.headers['x-user-role'] || req.user.role,
+    'x-user-email': req.headers['x-user-email'] || req.user.email,
+    'x-user-name': req.headers['x-user-name'] || req.user.name
+  };
+  if (req.headers['x-user-verified'] !== undefined) {
+    upstreamHeaders['x-user-verified'] = req.headers['x-user-verified'];
+  }
+
+  const response = await axios.get(
+    `${doctorServiceBaseUrl}/internal/by-email/${encodeURIComponent(email)}`,
+    {
+      headers: upstreamHeaders,
+      timeout: 10000
+    }
+  );
+
+  return response?.data?.doctor || null;
+};
+
+const normalizeReportMetadata = (body, { partial = false } = {}) => {
+  const errors = [];
+  const normalized = {};
+  const hasDoctorUserId = body.doctorUserId !== undefined && String(body.doctorUserId || '').trim();
+
+  if (!partial || body.reportType !== undefined) {
+    const reportType = String(body.reportType || '').trim();
+    if (!reportType || !REPORT_TYPES.has(reportType)) {
+      errors.push('reportType is required and must be one of: lab, radiology, prescription-scan, discharge-summary, other');
+    } else {
+      normalized.reportType = reportType;
+    }
+  }
+
+  if (!partial || body.title !== undefined) {
+    const title = String(body.title || '').trim();
+    if (!title) {
+      errors.push('title is required');
+    } else {
+      normalized.title = title;
+    }
+  }
+
+  if (body.description !== undefined) {
+    normalized.description = String(body.description || '').trim();
+  }
+
+  if (body.doctorUserId !== undefined) {
+    normalized.doctorUserId = String(body.doctorUserId || '').trim();
+  }
+  if (body.doctorEmail !== undefined) {
+    normalized.doctorEmail = String(body.doctorEmail || '').trim().toLowerCase();
+  }
+
+  if (body.visibility !== undefined || !partial) {
+    const visibility = String(body.visibility || (hasDoctorUserId ? 'shared' : 'private')).trim().toLowerCase();
+    if (!['private', 'shared'].includes(visibility)) {
+      errors.push('visibility must be one of: private, shared');
+    } else {
+      normalized.visibility = visibility;
+    }
+  }
+
+  if (body.appointmentId !== undefined) {
+    normalized.appointmentId = String(body.appointmentId || '').trim();
+  }
+
+  if (body.hospitalOrLabName !== undefined) {
+    normalized.hospitalOrLabName = String(body.hospitalOrLabName || '').trim();
+  }
+
+  if (!partial || body.reportDate !== undefined) {
+    const reportDate = parseDate(body.reportDate);
+    if (!reportDate) {
+      errors.push('reportDate is required and must be a valid date');
+    } else {
+      normalized.reportDate = reportDate;
+    }
+  }
+
+  if (body.isCritical !== undefined || !partial) {
+    normalized.isCritical = parseBoolean(body.isCritical, false);
+  }
+
+  if (body.tags !== undefined) {
+    normalized.tags = parseArray(body.tags);
+  }
+
+  if (body.status !== undefined) {
+    const status = String(body.status || '').trim().toLowerCase();
+    if (!REPORT_STATUSES.has(status)) {
+      errors.push('status must be one of: active, archived, deleted');
+    } else {
+      normalized.status = status;
+    }
+  }
+
+  if (
+    normalized.visibility === 'shared' &&
+    !String(normalized.doctorUserId || '').trim() &&
+    !String(normalized.doctorEmail || '').trim()
+  ) {
+    errors.push('doctorUserId or doctorEmail is required when visibility is shared');
+  }
+
+  return { errors, normalized };
+};
+
 // ─────────────────────────────────────────────────────
-// DELETE /patients/reports/:reportId
-// Delete a specific report — removes from Cloudinary AND database
+// POST /patients/reports
+// Upload a medical report with metadata
 // ─────────────────────────────────────────────────────
-exports.deleteReport = async (req, res) => {
+exports.uploadReport = async (req, res) => {
   try {
-    // Find the patient
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { errors, normalized } = normalizeReportMetadata(req.body, { partial: false });
+    if (errors.length) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+
+    let resolvedDoctorUserId = String(normalized.doctorUserId || '').trim();
+    if (!resolvedDoctorUserId && normalized.visibility === 'shared' && normalized.doctorEmail) {
+      try {
+        const doctor = await resolveDoctorByEmail(req, normalized.doctorEmail);
+        resolvedDoctorUserId = doctor?.userId || '';
+      } catch (err) {
+        if (err.response?.status === 404) {
+          return res.status(404).json({ error: 'No doctor profile found for this email' });
+        }
+        return res.status(503).json({ error: 'Unable to resolve doctor by email at the moment' });
+      }
+    }
+
+    if (normalized.visibility === 'shared' && !resolvedDoctorUserId) {
+      return res.status(400).json({ error: 'doctorUserId or valid doctorEmail is required for shared reports' });
+    }
+
+    // Infer resource type from MIME type (more reliable than Cloudinary metadata)
+    const mimeType = String(req.file.mimetype || '').toLowerCase();
+    const resourceType = mimeType.startsWith('image/') ? 'image' : 'raw';
+    const extension = (req.file.originalname || '').split('.').pop();
+    const format = (req.file.format || extension || '').toLowerCase();
+
+    console.log(`uploadReport: ${req.file.originalname} -> mimeType=${mimeType} -> resourceType=${resourceType}`);
+
+    const { doctorEmail, ...normalizedWithoutDoctorEmail } = normalized;
+
+    const newReport = {
+      filename: req.file.originalname,
+      url: req.file.path,
+      publicId: req.file.filename,
+      resourceType,
+      fileType: req.file.mimetype,
+      format,
+      size: req.file.size,
+      ...normalizedWithoutDoctorEmail,
+      doctorUserId: resolvedDoctorUserId || normalized.doctorUserId,
+      patientUserId: req.user.id,
+      createdBy: req.user.id,
+      updatedBy: req.user.id,
+      sharedWithDoctors: resolvedDoctorUserId ? [resolvedDoctorUserId] : (normalized.doctorUserId ? [normalized.doctorUserId] : []),
+      visibility: normalized.visibility || (resolvedDoctorUserId || normalized.doctorUserId ? 'shared' : 'private')
+    };
+
+    const patient = await Patient.findOneAndUpdate(
+      { userId: req.user.id },
+      { $push: { medicalReports: newReport } },
+      { new: true }
+    );
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient profile not found' });
+    }
+
+    const report = patient.medicalReports[patient.medicalReports.length - 1];
+    res.status(201).json({
+      message: 'Report uploaded successfully',
+      report
+    });
+  } catch (err) {
+    console.error('uploadReport error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// GET /patients/reports
+// Get reports with filters and pagination
+// ─────────────────────────────────────────────────────
+exports.getReports = async (req, res) => {
+  try {
+    const patient = await Patient
+      .findOne({ userId: req.user.id })
+      .select('medicalReports');
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+    const search = String(req.query.search || '').trim().toLowerCase();
+    const fromDate = parseDate(req.query.fromDate);
+    const toDate = parseDate(req.query.toDate);
+    const reportType = req.query.type ? String(req.query.type).trim() : null;
+    const tag = req.query.tag ? String(req.query.tag).trim().toLowerCase() : null;
+    const includeDeleted = parseBoolean(req.query.includeDeleted, false);
+    const status = req.query.status ? String(req.query.status).trim().toLowerCase() : null;
+
+    let reports = patient.medicalReports.slice();
+
+    if (!includeDeleted) {
+      reports = reports.filter((report) => report.status !== 'deleted');
+    }
+
+    if (status && REPORT_STATUSES.has(status)) {
+      reports = reports.filter((report) => report.status === status);
+    }
+
+    if (reportType) {
+      reports = reports.filter((report) => report.reportType === reportType);
+    }
+
+    if (req.query.visibility) {
+      const visibility = String(req.query.visibility).trim().toLowerCase();
+      if (visibility === 'private' || visibility === 'shared') {
+        reports = reports.filter((report) => resolveReportVisibility(report) === visibility);
+      }
+    }
+
+    if (fromDate) {
+      reports = reports.filter((report) => report.reportDate && new Date(report.reportDate) >= fromDate);
+    }
+
+    if (toDate) {
+      reports = reports.filter((report) => report.reportDate && new Date(report.reportDate) <= toDate);
+    }
+
+    if (tag) {
+      reports = reports.filter((report) => (report.tags || []).some((t) => String(t).toLowerCase() === tag));
+    }
+
+    if (search) {
+      reports = reports.filter((report) => {
+        const title = String(report.title || '').toLowerCase();
+        const description = String(report.description || '').toLowerCase();
+        const facility = String(report.hospitalOrLabName || '').toLowerCase();
+        return title.includes(search) || description.includes(search) || facility.includes(search);
+      });
+    }
+
+    reports.sort((a, b) => new Date(b.reportDate || b.uploadedAt || 0) - new Date(a.reportDate || a.uploadedAt || 0));
+
+    const total = reports.length;
+    const startIndex = (page - 1) * limit;
+    const paginated = reports
+      .slice(startIndex, startIndex + limit)
+      .map((report) => withResolvedVisibility(report));
+
+    res.status(200).json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      count: paginated.length,
+      reports: paginated
+    });
+  } catch (err) {
+    console.error('getReports error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// GET /patients/reports/:reportId
+// Get one report by id
+// ─────────────────────────────────────────────────────
+exports.getReportById = async (req, res) => {
+  try {
+    let patient = null;
+    let report = null;
+
+    if (req.user.role === 'doctor') {
+      patient = await Patient
+        .findOne({
+          medicalReports: {
+            $elemMatch: {
+              _id: req.params.reportId,
+              sharedWithDoctors: req.user.id,
+              status: { $ne: 'deleted' }
+            }
+          }
+        })
+        .select('medicalReports userId name email');
+    } else {
+      patient = await Patient
+        .findOne({ userId: req.user.id })
+        .select('medicalReports userId name email');
+    }
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    report = patient.medicalReports.id(req.params.reportId);
+    if (!report || report.status === 'deleted') {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    if (req.user.role === 'doctor' && !report.sharedWithDoctors.includes(req.user.id)) {
+      return res.status(403).json({ error: 'You do not have access to this report' });
+    }
+
+    const responsePayload = withResolvedVisibility(report);
+    if (req.user.role === 'doctor') {
+      responsePayload.patient = {
+        userId: patient.userId,
+        name: patient.name,
+        email: patient.email
+      };
+    }
+
+    res.status(200).json(responsePayload);
+  } catch (err) {
+    console.error('getReportById error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// PATCH /patients/reports/:reportId
+// Update report metadata
+// ─────────────────────────────────────────────────────
+exports.updateReportMetadata = async (req, res) => {
+  try {
+    const { errors, normalized } = normalizeReportMetadata(req.body, { partial: true });
+    if (errors.length) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+
     const patient = await Patient.findOne({ userId: req.user.id });
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Find the specific report inside the array
     const report = patient.medicalReports.id(req.params.reportId);
-    if (!report) {
+    if (!report || report.status === 'deleted') {
       return res.status(404).json({ error: 'Report not found' });
     }
 
-    // Delete from Cloudinary first
-    await cloudinary.uploader.destroy(report.publicId, {
-      resource_type: 'raw'  // use 'raw' for PDFs, 'image' for images
+    Object.keys(normalized).forEach((key) => {
+      report[key] = normalized[key];
+    });
+    report.updatedBy = req.user.id;
+
+    await patient.save();
+
+    res.status(200).json({
+      message: 'Report updated successfully',
+      report
+    });
+  } catch (err) {
+    console.error('updateReportMetadata error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// POST /patients/reports/:reportId/share
+// Share report with doctor
+// ─────────────────────────────────────────────────────
+exports.shareReportWithDoctor = async (req, res) => {
+  try {
+    const doctorUserId = String(req.body.doctorUserId || '').trim();
+    if (!doctorUserId) {
+      return res.status(400).json({ error: 'doctorUserId is required' });
+    }
+
+    const patient = await Patient.findOne({ userId: req.user.id });
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const report = patient.medicalReports.id(req.params.reportId);
+    if (!report || report.status === 'deleted') {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    if (!report.sharedWithDoctors.includes(doctorUserId)) {
+      report.sharedWithDoctors.push(doctorUserId);
+    }
+    report.visibility = 'shared';
+    report.updatedBy = req.user.id;
+
+    await patient.save();
+
+    res.status(200).json({
+      message: 'Report shared successfully',
+      report
+    });
+  } catch (err) {
+    console.error('shareReportWithDoctor error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// POST /patients/reports/:reportId/unshare
+// Remove doctor access to report
+// ─────────────────────────────────────────────────────
+exports.unshareReportWithDoctor = async (req, res) => {
+  try {
+    const doctorUserId = String(req.body.doctorUserId || '').trim();
+    if (!doctorUserId) {
+      return res.status(400).json({ error: 'doctorUserId is required' });
+    }
+
+    const patient = await Patient.findOne({ userId: req.user.id });
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const report = patient.medicalReports.id(req.params.reportId);
+    if (!report || report.status === 'deleted') {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    report.sharedWithDoctors = report.sharedWithDoctors.filter((id) => id !== doctorUserId);
+    report.visibility = report.sharedWithDoctors.length > 0 ? 'shared' : 'private';
+    report.updatedBy = req.user.id;
+
+    await patient.save();
+
+    res.status(200).json({
+      message: 'Report unshared successfully',
+      report
+    });
+  } catch (err) {
+    console.error('unshareReportWithDoctor error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// PATCH /patients/reports/:reportId/archive
+// Archive report
+// ─────────────────────────────────────────────────────
+exports.archiveReport = async (req, res) => {
+  try {
+    const patient = await Patient.findOne({ userId: req.user.id });
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const report = patient.medicalReports.id(req.params.reportId);
+    if (!report || report.status === 'deleted') {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    report.status = 'archived';
+    report.updatedBy = req.user.id;
+    await patient.save();
+
+    res.status(200).json({
+      message: 'Report archived successfully',
+      report
+    });
+  } catch (err) {
+    console.error('archiveReport error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// GET /patients/reports/download/:reportId
+// Return signed url for secure download
+// ─────────────────────────────────────────────────────
+exports.getReportDownloadUrl = async (req, res) => {
+  try {
+    let patient = null;
+    if (req.user.role === 'doctor') {
+      patient = await Patient
+        .findOne({
+          medicalReports: {
+            $elemMatch: {
+              _id: req.params.reportId,
+              sharedWithDoctors: req.user.id,
+              status: { $ne: 'deleted' }
+            }
+          }
+        })
+        .select('medicalReports');
+    } else {
+      patient = await Patient
+        .findOne({ userId: req.user.id })
+        .select('medicalReports');
+    }
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const report = patient.medicalReports.id(req.params.reportId);
+    if (!report || report.status === 'deleted') {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    if (req.user.role === 'doctor' && !report.sharedWithDoctors.includes(req.user.id)) {
+      return res.status(403).json({ error: 'You do not have access to this report' });
+    }
+
+    let downloadUrl = report.url;
+    let usedFallbackUrl = true;
+    const mode = String(req.query.mode || 'download').toLowerCase();
+    const asAttachment = mode !== 'view';
+
+    console.log(`getReportDownloadUrl: reportId=${report._id}, resourceType=${report.resourceType}, format=${report.format}`);
+
+    try {
+      const mimeType = String(report.fileType || '').toLowerCase();
+      const inferredPreferredType = mimeType.startsWith('image/') ? 'image' : 'raw';
+      const candidates = [...new Set([report.resourceType, inferredPreferredType, 'image', 'raw'])].filter(Boolean);
+
+      let cloudinaryResource = null;
+      for (const resourceType of candidates) {
+        try {
+          const resource = await cloudinary.api.resource(report.publicId, { resource_type: resourceType });
+          if (resource?.secure_url) {
+            cloudinaryResource = { resourceType, secureUrl: resource.secure_url };
+            break;
+          }
+        } catch (err) {
+          const notFound = err?.http_code === 404 || String(err?.message || '').toLowerCase().includes('not found');
+          if (!notFound) {
+            console.warn(`cloudinary resource lookup ${resourceType} error:`, err.message);
+          }
+        }
+      }
+
+      if (!cloudinaryResource) {
+        throw new Error('Resource not found on Cloudinary');
+      }
+
+      console.log(`  resolved Cloudinary resourceType: ${cloudinaryResource.resourceType}`);
+      const fileFormat =
+        String(cloudinaryResource.format || report.format || inferFormatFromFilename(report.filename) || '').toLowerCase();
+
+      if (!fileFormat) {
+        throw new Error('Unable to determine report format for signed download URL');
+      }
+
+      downloadUrl = cloudinary.utils.private_download_url(
+        report.publicId,
+        fileFormat,
+        {
+          resource_type: cloudinaryResource.resourceType,
+          type: 'upload',
+          expires_at: Math.floor(Date.now() / 1000) + 600,
+          attachment: asAttachment
+        }
+      );
+      usedFallbackUrl = false;
+    } catch (cloudinaryError) {
+      console.error('getReportDownloadUrl cloudinary error:', cloudinaryError.message);
+      downloadUrl = report.url;
+      usedFallbackUrl = true;
+      console.log(`  using fallback URL: ${downloadUrl}`);
+    }
+
+    res.status(200).json({
+      reportId: report._id,
+      mode,
+      expiresInSeconds: 600,
+      downloadUrl,
+      usedFallbackUrl
+    });
+  } catch (err) {
+    console.error('getReportDownloadUrl error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// GET /patients/reports/shared/me
+// Doctor can view reports shared with them
+// ─────────────────────────────────────────────────────
+exports.getMySharedReportsAsDoctor = async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Only doctors can access shared report feed' });
+    }
+
+    const patients = await Patient
+      .find({
+        medicalReports: {
+          $elemMatch: {
+            sharedWithDoctors: req.user.id,
+            status: { $ne: 'deleted' }
+          }
+        }
+      })
+      .select('userId name email medicalReports');
+
+    const sharedReports = [];
+    patients.forEach((patient) => {
+      patient.medicalReports.forEach((report) => {
+        if (report.status !== 'deleted' && report.sharedWithDoctors.includes(req.user.id)) {
+          sharedReports.push({
+            patient: {
+              userId: patient.userId,
+              name: patient.name,
+              email: patient.email
+            },
+            report: withResolvedVisibility(report)
+          });
+        }
+      });
     });
 
-    // Remove from MongoDB
-    report.deleteOne();
-    await patient.save();
+    res.status(200).json({
+      count: sharedReports.length,
+      reports: sharedReports
+    });
+  } catch (err) {
+    console.error('getMySharedReportsAsDoctor error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// DELETE /patients/reports/:reportId
+// Soft delete report and remove remote file
+// ─────────────────────────────────────────────────────
+exports.deleteReport = async (req, res) => {
+  try {
+    const patient = await Patient.findOne({ userId: req.user.id });
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const report = patient.medicalReports.id(req.params.reportId);
+    if (!report || report.status === 'deleted') {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const resourceTypeCandidates = [...new Set([report.resourceType, 'image', 'raw'])].filter(Boolean);
+    for (const resourceType of resourceTypeCandidates) {
+      try {
+        await cloudinary.uploader.destroy(report.publicId, { resource_type: resourceType });
+      } catch (destroyErr) {
+        console.warn(`deleteReport cloudinary destroy ${resourceType} error:`, destroyErr.message);
+      }
+    }
+
+    await Patient.updateOne(
+      { userId: req.user.id },
+      {
+        $set: {
+          'medicalReports.$[report].status': 'deleted',
+          'medicalReports.$[report].deletedAt': new Date(),
+          'medicalReports.$[report].deletedBy': req.user.id,
+          'medicalReports.$[report].updatedBy': req.user.id
+        }
+      },
+      {
+        arrayFilters: [{ 'report._id': report._id }]
+      }
+    );
 
     res.status(200).json({ message: 'Report deleted successfully' });
 

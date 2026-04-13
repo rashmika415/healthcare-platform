@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const auth   = require('../middleware/authmiddleware');
+const auth   = require('../middleware/authMiddleware');
 const c      = require('../controllers/patientController');
 const { upload } = require('../config/cloudinaryConfig');
 
@@ -24,6 +24,13 @@ router.get('/internal/:userId',           c.getPatientByUserId);
 // ── Report routes ───────────────────────────────
 router.post('/reports', upload.single('report'), c.uploadReport);
 router.get('/reports',                           c.getReports);
+router.get('/reports/shared/me',                 c.getMySharedReportsAsDoctor);
+router.get('/reports/download/:reportId',        c.getReportDownloadUrl);
+router.get('/reports/:reportId',                 c.getReportById);
+router.patch('/reports/:reportId',               c.updateReportMetadata);
+router.patch('/reports/:reportId/archive',       c.archiveReport);
+router.post('/reports/:reportId/share',          c.shareReportWithDoctor);
+router.post('/reports/:reportId/unshare',        c.unshareReportWithDoctor);
 router.delete('/reports/:reportId',              c.deleteReport);
 
 module.exports = router;

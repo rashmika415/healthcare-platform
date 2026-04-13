@@ -11,6 +11,7 @@ const doctorController = require('../controllers/doctorController');
 router.get('/public/filters', doctorController.publicFilters);
 router.get('/public/doctors', doctorController.publicSearchDoctors);
 router.get('/public/doctors/:doctorId', doctorController.publicGetDoctorProfile);
+router.get('/internal/by-email/:email', authMiddleware, doctorController.internalGetDoctorByEmail);
 
 
 // 🔹 GET Doctor Profile
