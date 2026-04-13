@@ -19,9 +19,8 @@ const NexusLogin = () => {
   };
 
   const getRedirectPathByRole = (role) => {
-    if (role === 'patient') return '/patient/dashboard';
+    // Doctors go directly to dashboard, others go to home page first
     if (role === 'doctor') return '/doctor/dashboard';
-    if (role === 'admin') return '/admin/dashboard';
     return '/';
   };
 

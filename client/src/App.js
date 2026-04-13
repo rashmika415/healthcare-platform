@@ -34,14 +34,10 @@ import Profile from "./pages/doctor/Profile";
 import Availability from "./pages/doctor/Availability";
 import VideoServiceTest from './pages/video/VideoServiceTest';
 
-
 // //Appointment pages
 import AddAppointment from './components/appointment/AddAppointment';
 import AppointmentDashboard from './components/appointment/AppointmentDashboard';
 import ViewAppointment from './components/appointment/ViewAppointment';
-
-
-
 
 // // Admin pages
 // import AdminDashboard from './pages/admin/AdminDashboard';
@@ -144,14 +140,6 @@ export default function App() {
               <AddAppointment />
             </PrivateRoute>
           } />
-
-          <Route path="/patient/view-appointments" element={
-            <PrivateRoute role="patient">
-              <ViewAppointment />
-            </PrivateRoute>
-          } />
-
-          
 
           {/* ── Admin ──────────────────────────────
           <Route path="/admin/dashboard" element={
