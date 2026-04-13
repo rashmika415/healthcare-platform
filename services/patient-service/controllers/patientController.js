@@ -189,6 +189,78 @@ exports.getMedicalHistory = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────
+// GET /patients/medical-history
+// Aggregated timeline for logged-in patient (read-only)
+// ─────────────────────────────────────────────────────
+exports.getMedicalHistoryOverview = async (req, res) => {
+  try {
+    const patient = await Patient
+      .findOne({ userId: req.user.id })
+      .select('medicalHistory prescriptions');
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const historyItems = (patient.medicalHistory || []).map((h) => ({
+      type: 'history',
+      date: h?.date || null,
+      title: h?.diagnosis || 'Medical history update',
+      data: h,
+    }));
+
+    const rxItems = (patient.prescriptions || []).map((p) => ({
+      type: 'prescription',
+      date: p?.issuedAt || null,
+      title: p?.doctorName ? `Prescription by ${p.doctorName}` : 'Prescription',
+      data: p,
+    }));
+
+    const timeline = sortByDateDesc([...historyItems, ...rxItems].map((item) => ({
+      ...item,
+      // normalize date key for sorting helper
+      date: item.date,
+    })));
+
+    return res.status(200).json({
+      count: timeline.length,
+      timeline,
+    });
+  } catch (err) {
+    console.error('getMedicalHistoryOverview error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// GET /patients/emails
+// Used by doctor prescription UI dropdown
+// ─────────────────────────────────────────────────────
+exports.getAllPatientEmails = async (req, res) => {
+  try {
+    if (req.user?.role && !['doctor', 'admin'].includes(String(req.user.role))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const patients = await Patient.find({})
+      .select('name email userId')
+      .sort({ createdAt: -1 })
+      .limit(500);
+
+    return res.status(200).json({
+      patients: (patients || []).map((p) => ({
+        name: p.name,
+        email: p.email,
+        userId: p.userId,
+      })),
+    });
+  } catch (err) {
+    console.error('getAllPatientEmails error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 
 // ─────────────────────────────────────────────────────
 // POST /patients/internal/add-prescription
