@@ -56,6 +56,11 @@ const reportSchema = new mongoose.Schema({
   isCritical:  { type: Boolean, default: false },
   tags:        [{ type: String, trim: true }],
   sharedWithDoctors: [{ type: String }],
+  visibility: {
+    type: String,
+    enum: ['private', 'shared'],
+    default: 'private'
+  },
   status: {
     type: String,
     enum: ['active', 'archived', 'deleted'],

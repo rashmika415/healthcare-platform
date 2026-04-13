@@ -369,9 +369,54 @@ const parseDate = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
+const inferFormatFromFilename = (filename = '') => {
+  const parts = String(filename).split('.');
+  return parts.length > 1 ? String(parts.pop() || '').toLowerCase() : '';
+};
+
+const resolveReportVisibility = (report) => {
+  if (report?.visibility === 'private' || report?.visibility === 'shared') {
+    return report.visibility;
+  }
+  return Array.isArray(report?.sharedWithDoctors) && report.sharedWithDoctors.length > 0 ? 'shared' : 'private';
+};
+
+const withResolvedVisibility = (report) => {
+  if (!report) return report;
+  const normalized = typeof report.toObject === 'function' ? report.toObject() : { ...report };
+  normalized.visibility = resolveReportVisibility(report);
+  return normalized;
+};
+
+const resolveDoctorByEmail = async (req, doctorEmail) => {
+  const email = String(doctorEmail || '').trim().toLowerCase();
+  if (!email) return null;
+
+  const upstreamHeaders = {
+    'x-user-id': req.headers['x-user-id'] || req.user.id,
+    'x-user-role': req.headers['x-user-role'] || req.user.role,
+    'x-user-email': req.headers['x-user-email'] || req.user.email,
+    'x-user-name': req.headers['x-user-name'] || req.user.name
+  };
+  if (req.headers['x-user-verified'] !== undefined) {
+    upstreamHeaders['x-user-verified'] = req.headers['x-user-verified'];
+  }
+
+  const response = await axios.get(
+    `${doctorServiceBaseUrl}/internal/by-email/${encodeURIComponent(email)}`,
+    {
+      headers: upstreamHeaders,
+      timeout: 10000
+    }
+  );
+
+  return response?.data?.doctor || null;
+};
+
 const normalizeReportMetadata = (body, { partial = false } = {}) => {
   const errors = [];
   const normalized = {};
+  const hasDoctorUserId = body.doctorUserId !== undefined && String(body.doctorUserId || '').trim();
 
   if (!partial || body.reportType !== undefined) {
     const reportType = String(body.reportType || '').trim();
@@ -397,6 +442,18 @@ const normalizeReportMetadata = (body, { partial = false } = {}) => {
 
   if (body.doctorUserId !== undefined) {
     normalized.doctorUserId = String(body.doctorUserId || '').trim();
+  }
+  if (body.doctorEmail !== undefined) {
+    normalized.doctorEmail = String(body.doctorEmail || '').trim().toLowerCase();
+  }
+
+  if (body.visibility !== undefined || !partial) {
+    const visibility = String(body.visibility || (hasDoctorUserId ? 'shared' : 'private')).trim().toLowerCase();
+    if (!['private', 'shared'].includes(visibility)) {
+      errors.push('visibility must be one of: private, shared');
+    } else {
+      normalized.visibility = visibility;
+    }
   }
 
   if (body.appointmentId !== undefined) {
@@ -433,63 +490,15 @@ const normalizeReportMetadata = (body, { partial = false } = {}) => {
     }
   }
 
+  if (
+    normalized.visibility === 'shared' &&
+    !String(normalized.doctorUserId || '').trim() &&
+    !String(normalized.doctorEmail || '').trim()
+  ) {
+    errors.push('doctorUserId or doctorEmail is required when visibility is shared');
+  }
+
   return { errors, normalized };
-};
-
-const buildReportDownloadUrl = (report, resourceType = 'raw') => {
-  // Infer type from format/extension if not set
-  let finalType = resourceType || report.resourceType;
-  if (!finalType && report.format) {
-    finalType = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'].includes(String(report.format).toLowerCase()) ? 'raw' : 'image';
-  }
-  finalType = finalType || 'raw';
-
-  console.log(`buildReportDownloadUrl: publicId=${report.publicId}, format=${report.format}, finalType=${finalType}`);
-
-  if (finalType === 'raw') {
-    const url = cloudinary.url(report.publicId, {
-      secure: true,
-      resource_type: 'raw',
-      type: 'upload',
-      attachment: report.filename
-    });
-    console.log(`  -> raw URL: ${url}`);
-    return url;
-  }
-
-  const expiresAt = Math.floor(Date.now() / 1000) + 600;
-  const url = cloudinary.url(report.publicId, {
-    secure: true,
-    sign_url: true,
-    expires_at: expiresAt,
-    resource_type: finalType,
-    type: 'upload',
-    attachment: report.filename
-  });
-  console.log(`  -> signed URL (${finalType}): ${url}`);
-  return url;
-};
-
-const resolveCloudinaryResourceType = async (publicId, preferredType = 'raw') => {
-  // Try to detect resource type from Cloudinary
-  const candidates = [preferredType, 'image', 'raw', 'video'].filter(Boolean);
-  const uniqueCandidates = [...new Set(candidates)];
-
-  for (const resourceType of uniqueCandidates) {
-    try {
-      const resource = await cloudinary.api.resource(publicId, { resource_type: resourceType });
-      if (resource && resource.public_id) {
-        return resourceType;
-      }
-    } catch (err) {
-      const notFound = err?.http_code === 404 || String(err?.message || '').toLowerCase().includes('not found');
-      if (!notFound) {
-        console.warn(`resolveCloudinaryResourceType ${resourceType} error:`, err.message);
-      }
-    }
-  }
-
-  return preferredType || 'raw';
 };
 
 // ─────────────────────────────────────────────────────
@@ -507,6 +516,23 @@ exports.uploadReport = async (req, res) => {
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
 
+    let resolvedDoctorUserId = String(normalized.doctorUserId || '').trim();
+    if (!resolvedDoctorUserId && normalized.visibility === 'shared' && normalized.doctorEmail) {
+      try {
+        const doctor = await resolveDoctorByEmail(req, normalized.doctorEmail);
+        resolvedDoctorUserId = doctor?.userId || '';
+      } catch (err) {
+        if (err.response?.status === 404) {
+          return res.status(404).json({ error: 'No doctor profile found for this email' });
+        }
+        return res.status(503).json({ error: 'Unable to resolve doctor by email at the moment' });
+      }
+    }
+
+    if (normalized.visibility === 'shared' && !resolvedDoctorUserId) {
+      return res.status(400).json({ error: 'doctorUserId or valid doctorEmail is required for shared reports' });
+    }
+
     // Infer resource type from MIME type (more reliable than Cloudinary metadata)
     const mimeType = String(req.file.mimetype || '').toLowerCase();
     const resourceType = mimeType.startsWith('image/') ? 'image' : 'raw';
@@ -514,6 +540,8 @@ exports.uploadReport = async (req, res) => {
     const format = (req.file.format || extension || '').toLowerCase();
 
     console.log(`uploadReport: ${req.file.originalname} -> mimeType=${mimeType} -> resourceType=${resourceType}`);
+
+    const { doctorEmail, ...normalizedWithoutDoctorEmail } = normalized;
 
     const newReport = {
       filename: req.file.originalname,
@@ -523,11 +551,13 @@ exports.uploadReport = async (req, res) => {
       fileType: req.file.mimetype,
       format,
       size: req.file.size,
-      ...normalized,
+      ...normalizedWithoutDoctorEmail,
+      doctorUserId: resolvedDoctorUserId || normalized.doctorUserId,
       patientUserId: req.user.id,
       createdBy: req.user.id,
       updatedBy: req.user.id,
-      sharedWithDoctors: []
+      sharedWithDoctors: resolvedDoctorUserId ? [resolvedDoctorUserId] : (normalized.doctorUserId ? [normalized.doctorUserId] : []),
+      visibility: normalized.visibility || (resolvedDoctorUserId || normalized.doctorUserId ? 'shared' : 'private')
     };
 
     const patient = await Patient.findOneAndUpdate(
@@ -589,6 +619,13 @@ exports.getReports = async (req, res) => {
       reports = reports.filter((report) => report.reportType === reportType);
     }
 
+    if (req.query.visibility) {
+      const visibility = String(req.query.visibility).trim().toLowerCase();
+      if (visibility === 'private' || visibility === 'shared') {
+        reports = reports.filter((report) => resolveReportVisibility(report) === visibility);
+      }
+    }
+
     if (fromDate) {
       reports = reports.filter((report) => report.reportDate && new Date(report.reportDate) >= fromDate);
     }
@@ -614,7 +651,9 @@ exports.getReports = async (req, res) => {
 
     const total = reports.length;
     const startIndex = (page - 1) * limit;
-    const paginated = reports.slice(startIndex, startIndex + limit);
+    const paginated = reports
+      .slice(startIndex, startIndex + limit)
+      .map((report) => withResolvedVisibility(report));
 
     res.status(200).json({
       page,
@@ -636,20 +675,50 @@ exports.getReports = async (req, res) => {
 // ─────────────────────────────────────────────────────
 exports.getReportById = async (req, res) => {
   try {
-    const patient = await Patient
-      .findOne({ userId: req.user.id })
-      .select('medicalReports');
+    let patient = null;
+    let report = null;
+
+    if (req.user.role === 'doctor') {
+      patient = await Patient
+        .findOne({
+          medicalReports: {
+            $elemMatch: {
+              _id: req.params.reportId,
+              sharedWithDoctors: req.user.id,
+              status: { $ne: 'deleted' }
+            }
+          }
+        })
+        .select('medicalReports userId name email');
+    } else {
+      patient = await Patient
+        .findOne({ userId: req.user.id })
+        .select('medicalReports userId name email');
+    }
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    const report = patient.medicalReports.id(req.params.reportId);
+    report = patient.medicalReports.id(req.params.reportId);
     if (!report || report.status === 'deleted') {
       return res.status(404).json({ error: 'Report not found' });
     }
 
-    res.status(200).json(report);
+    if (req.user.role === 'doctor' && !report.sharedWithDoctors.includes(req.user.id)) {
+      return res.status(403).json({ error: 'You do not have access to this report' });
+    }
+
+    const responsePayload = withResolvedVisibility(report);
+    if (req.user.role === 'doctor') {
+      responsePayload.patient = {
+        userId: patient.userId,
+        name: patient.name,
+        email: patient.email
+      };
+    }
+
+    res.status(200).json(responsePayload);
   } catch (err) {
     console.error('getReportById error:', err.message);
     res.status(500).json({ error: err.message });
@@ -718,6 +787,7 @@ exports.shareReportWithDoctor = async (req, res) => {
     if (!report.sharedWithDoctors.includes(doctorUserId)) {
       report.sharedWithDoctors.push(doctorUserId);
     }
+    report.visibility = 'shared';
     report.updatedBy = req.user.id;
 
     await patient.save();
@@ -754,6 +824,7 @@ exports.unshareReportWithDoctor = async (req, res) => {
     }
 
     report.sharedWithDoctors = report.sharedWithDoctors.filter((id) => id !== doctorUserId);
+    report.visibility = report.sharedWithDoctors.length > 0 ? 'shared' : 'private';
     report.updatedBy = req.user.id;
 
     await patient.save();
@@ -804,9 +875,24 @@ exports.archiveReport = async (req, res) => {
 // ─────────────────────────────────────────────────────
 exports.getReportDownloadUrl = async (req, res) => {
   try {
-    const patient = await Patient
-      .findOne({ userId: req.user.id })
-      .select('medicalReports');
+    let patient = null;
+    if (req.user.role === 'doctor') {
+      patient = await Patient
+        .findOne({
+          medicalReports: {
+            $elemMatch: {
+              _id: req.params.reportId,
+              sharedWithDoctors: req.user.id,
+              status: { $ne: 'deleted' }
+            }
+          }
+        })
+        .select('medicalReports');
+    } else {
+      patient = await Patient
+        .findOne({ userId: req.user.id })
+        .select('medicalReports');
+    }
 
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -817,30 +903,71 @@ exports.getReportDownloadUrl = async (req, res) => {
       return res.status(404).json({ error: 'Report not found' });
     }
 
+    if (req.user.role === 'doctor' && !report.sharedWithDoctors.includes(req.user.id)) {
+      return res.status(403).json({ error: 'You do not have access to this report' });
+    }
+
     let downloadUrl = report.url;
     let usedFallbackUrl = true;
+    const mode = String(req.query.mode || 'download').toLowerCase();
+    const asAttachment = mode !== 'view';
 
     console.log(`getReportDownloadUrl: reportId=${report._id}, resourceType=${report.resourceType}, format=${report.format}`);
 
     try {
-      const resolvedType = await resolveCloudinaryResourceType(report.publicId, report.resourceType || 'raw');
-      console.log(`  detected resourceType: ${resolvedType}`);
-      downloadUrl = buildReportDownloadUrl(report, resolvedType);
-      usedFallbackUrl = false;
+      const mimeType = String(report.fileType || '').toLowerCase();
+      const inferredPreferredType = mimeType.startsWith('image/') ? 'image' : 'raw';
+      const candidates = [...new Set([report.resourceType, inferredPreferredType, 'image', 'raw'])].filter(Boolean);
 
-      if (resolvedType !== report.resourceType) {
-        console.log(`  updating report resourceType: ${report.resourceType} -> ${resolvedType}`);
-        report.resourceType = resolvedType;
-        report.updatedBy = req.user.id;
-        await patient.save();
+      let cloudinaryResource = null;
+      for (const resourceType of candidates) {
+        try {
+          const resource = await cloudinary.api.resource(report.publicId, { resource_type: resourceType });
+          if (resource?.secure_url) {
+            cloudinaryResource = { resourceType, secureUrl: resource.secure_url };
+            break;
+          }
+        } catch (err) {
+          const notFound = err?.http_code === 404 || String(err?.message || '').toLowerCase().includes('not found');
+          if (!notFound) {
+            console.warn(`cloudinary resource lookup ${resourceType} error:`, err.message);
+          }
+        }
       }
+
+      if (!cloudinaryResource) {
+        throw new Error('Resource not found on Cloudinary');
+      }
+
+      console.log(`  resolved Cloudinary resourceType: ${cloudinaryResource.resourceType}`);
+      const fileFormat =
+        String(cloudinaryResource.format || report.format || inferFormatFromFilename(report.filename) || '').toLowerCase();
+
+      if (!fileFormat) {
+        throw new Error('Unable to determine report format for signed download URL');
+      }
+
+      downloadUrl = cloudinary.utils.private_download_url(
+        report.publicId,
+        fileFormat,
+        {
+          resource_type: cloudinaryResource.resourceType,
+          type: 'upload',
+          expires_at: Math.floor(Date.now() / 1000) + 600,
+          attachment: asAttachment
+        }
+      );
+      usedFallbackUrl = false;
     } catch (cloudinaryError) {
       console.error('getReportDownloadUrl cloudinary error:', cloudinaryError.message);
+      downloadUrl = report.url;
+      usedFallbackUrl = true;
       console.log(`  using fallback URL: ${downloadUrl}`);
     }
 
     res.status(200).json({
       reportId: report._id,
+      mode,
       expiresInSeconds: 600,
       downloadUrl,
       usedFallbackUrl
@@ -882,7 +1009,7 @@ exports.getMySharedReportsAsDoctor = async (req, res) => {
               name: patient.name,
               email: patient.email
             },
-            report
+            report: withResolvedVisibility(report)
           });
         }
       });
@@ -914,16 +1041,29 @@ exports.deleteReport = async (req, res) => {
       return res.status(404).json({ error: 'Report not found' });
     }
 
-    await cloudinary.uploader.destroy(report.publicId, {
-      resource_type: report.resourceType || 'raw'
-    });
+    const resourceTypeCandidates = [...new Set([report.resourceType, 'image', 'raw'])].filter(Boolean);
+    for (const resourceType of resourceTypeCandidates) {
+      try {
+        await cloudinary.uploader.destroy(report.publicId, { resource_type: resourceType });
+      } catch (destroyErr) {
+        console.warn(`deleteReport cloudinary destroy ${resourceType} error:`, destroyErr.message);
+      }
+    }
 
-    report.status = 'deleted';
-    report.deletedAt = new Date();
-    report.deletedBy = req.user.id;
-    report.updatedBy = req.user.id;
-
-    await patient.save();
+    await Patient.updateOne(
+      { userId: req.user.id },
+      {
+        $set: {
+          'medicalReports.$[report].status': 'deleted',
+          'medicalReports.$[report].deletedAt': new Date(),
+          'medicalReports.$[report].deletedBy': req.user.id,
+          'medicalReports.$[report].updatedBy': req.user.id
+        }
+      },
+      {
+        arrayFilters: [{ 'report._id': report._id }]
+      }
+    );
 
     res.status(200).json({ message: 'Report deleted successfully' });
 

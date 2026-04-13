@@ -31,6 +31,8 @@ export const uploadPatientReport = async (file, metadata = {}) => {
   if (metadata.hospitalOrLabName) formData.append('hospitalOrLabName', metadata.hospitalOrLabName);
   if (metadata.appointmentId) formData.append('appointmentId', metadata.appointmentId);
   if (metadata.doctorUserId) formData.append('doctorUserId', metadata.doctorUserId);
+  if (metadata.doctorEmail) formData.append('doctorEmail', metadata.doctorEmail);
+  if (metadata.visibility) formData.append('visibility', metadata.visibility);
   if (metadata.tags) {
     const tags = Array.isArray(metadata.tags) ? metadata.tags.join(',') : String(metadata.tags);
     if (tags.trim()) formData.append('tags', tags);
@@ -63,8 +65,10 @@ export const unsharePatientReport = async (reportId, doctorUserId) => {
   return response.data;
 };
 
-export const getPatientReportDownloadUrl = async (reportId) => {
-  const response = await api.get(`/patients/reports/download/${reportId}`);
+export const getPatientReportDownloadUrl = async (reportId, mode = 'download') => {
+  const response = await api.get(`/patients/reports/download/${reportId}`, {
+    params: { mode }
+  });
   return response.data;
 };
 
@@ -75,5 +79,10 @@ export const deletePatientReport = async (reportId) => {
 
 export const getDoctorSharedReports = async () => {
   const response = await api.get('/patients/reports/shared/me');
+  return response.data;
+};
+
+export const getVerifiedDoctorsForSharing = async () => {
+  const response = await api.get('/public/doctors');
   return response.data;
 };
