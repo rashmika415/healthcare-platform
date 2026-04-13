@@ -172,3 +172,39 @@ exports.deletePrescription = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
+// ── Get All Prescriptions for Logged-in Patient ─────
+exports.getPatientPrescriptions = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const requestedPatientId = String(req.params.patientUserId || '').trim();
+    if (!requestedPatientId) {
+      return res.status(400).json({ error: 'patientUserId is required' });
+    }
+
+    // Patients can only read their own prescriptions.
+    if (req.user.role === 'patient' && String(req.user.id).trim() !== requestedPatientId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { status } = req.query;
+    const filter = { patientUserId: requestedPatientId };
+    if (status) {
+      if (!['active', 'completed', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+      filter.status = status;
+    }
+
+    const prescriptions = await Prescription.find(filter).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      total: prescriptions.length,
+      prescriptions,
+    });
+  } catch (err) {
+    console.error('getPatientPrescriptions error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
