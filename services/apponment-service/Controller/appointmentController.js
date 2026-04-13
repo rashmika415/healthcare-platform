@@ -140,7 +140,7 @@ const getappointmentbyid = async (req, res) => {
 //update appointment
 const updateappointment = async (req, res) => {
     const id = req.params.id;
-    const { patientId, doctorId, patientName, doctorName, specialization, date, time } = req.body;
+    const { patientId, doctorId, patientName, doctorName, specialization, date, time ,paymentStatus   } = req.body;
     let appointment;
     try {
         appointment = await Appointment.findByIdAndUpdate(id, { 
@@ -150,8 +150,9 @@ const updateappointment = async (req, res) => {
             doctorName,
             specialization,
             date,
-            time
-        });
+            time,
+            paymentStatus
+        }, { new: true });
     }   
     catch (error) {
         console.log(error);
