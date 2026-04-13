@@ -39,6 +39,9 @@ import AddAppointment from './components/appointment/AddAppointment';
 import AppointmentDashboard from './components/appointment/AppointmentDashboard';
 import ViewAppointment from './components/appointment/ViewAppointment';
 
+// Payment page
+import Payment from './pages/payment/Payment';
+
 // // Admin pages
 // import AdminDashboard from './pages/admin/AdminDashboard';
 
@@ -127,24 +130,42 @@ export default function App() {
           {/* Video Service standalone test page (your part) */}
           <Route path="/video-test" element={<VideoServiceTest />} />
 
+            {/* Appointment routes */}
+            <Route
+              path="/patient/appointments"
+              element={
+                <PrivateRoute role="patient">
+                  <AppointmentDashboard />
+                </PrivateRoute>
+              }
+            />
 
-          {/* Appointment routes */}
-          <Route path="/patient/appointments" element={
-            <PrivateRoute role="patient">
-              <AppointmentDashboard />
-            </PrivateRoute>
-          } />
+            {/* Payment route */}
+            <Route
+              path="/payment"
+              element={
+                <PrivateRoute role="patient">
+                  <Payment />
+                </PrivateRoute>
+              }
+            />
 
-          <Route path="/patient/add-appointment" element={
-            <PrivateRoute role="patient">
-              <AddAppointment />
-            </PrivateRoute>
-          } />
+            {/* Add Appointment */}
+            <Route
+              path="/patient/add-appointment"
+              element={
+                <PrivateRoute role="patient">
+                  <AddAppointment />
+                </PrivateRoute>
+              }
+            />
 
-          {/* ── Admin ──────────────────────────────
+          {/* ── Admin ────────────────────────────── */}
+          {/*
           <Route path="/admin/dashboard" element={
             <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
           }/>
+          */}
 
           {/* ── Catch all ────────────────────────── */}
           <Route path="*" element={<Navigate to="/" />} />
