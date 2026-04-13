@@ -94,62 +94,160 @@ export default function PatientPrescriptions() {
 
 // ─── PatientHistory ───────────────────────────────────────────
 export function PatientHistory() {
-  const [history, setHistory] = useState([]);
+  const [timeline, setTimeline] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
+  const [error, setError] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   useEffect(() => {
-    api.get('/patients/history')
-      .then(r  => setHistory(r.data.history || []))
+    api.get('/patients/medical-history')
+      .then((r) => {
+        setTimeline(r.data.timeline || []);
+        setSummary(r.data.summary || null);
+      })
       .catch(() => setError('Failed to load history'))
       .finally(() => setLoading(false));
   }, []);
+
+  const filteredTimeline = timeline.filter((item) => {
+    if (typeFilter !== 'all' && item.type !== typeFilter) return false;
+
+    const itemDate = item.date ? new Date(item.date) : null;
+    if (fromDate && itemDate) {
+      const from = new Date(fromDate);
+      from.setHours(0, 0, 0, 0);
+      if (itemDate < from) return false;
+    }
+    if (toDate && itemDate) {
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+      if (itemDate > to) return false;
+    }
+
+    return true;
+  });
+
+  const formatDate = (value) => {
+    if (!value) return 'No date';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'No date';
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const itemAccent = (type) => {
+    if (type === 'prescription') return '#16a34a';
+    if (type === 'appointment') return '#1a56db';
+    if (type === 'report') return '#9a3412';
+    return '#0f766e';
+  };
 
   return (
     <PatientLayout title="Medical History" subtitle="Your past consultations and diagnoses">
       {error && <div style={hs.error}>{error}</div>}
 
+      {!loading && !error && (
+        <>
+          <div style={hs.filters}>
+            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={hs.select}>
+              <option value="all">All types</option>
+              <option value="history">Consultation Notes</option>
+              <option value="appointment">Appointments</option>
+              <option value="prescription">Prescriptions</option>
+              <option value="report">Reports</option>
+            </select>
+
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              style={hs.dateInput}
+            />
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              style={hs.dateInput}
+            />
+            <button
+              style={hs.clearBtn}
+              onClick={() => {
+                setTypeFilter('all');
+                setFromDate('');
+                setToDate('');
+              }}
+            >
+              Clear
+            </button>
+          </div>
+
+          {summary && (
+            <div style={hs.summaryGrid}>
+              <div style={hs.summaryCard}><span style={hs.summaryLabel}>Total</span><strong>{summary.totalEntries || 0}</strong></div>
+              <div style={hs.summaryCard}><span style={hs.summaryLabel}>Appointments</span><strong>{summary.appointments || 0}</strong></div>
+              <div style={hs.summaryCard}><span style={hs.summaryLabel}>Prescriptions</span><strong>{summary.prescriptions || 0}</strong></div>
+              <div style={hs.summaryCard}><span style={hs.summaryLabel}>Reports</span><strong>{summary.reports || 0}</strong></div>
+            </div>
+          )}
+        </>
+      )}
+
       {loading ? (
         <div style={hs.msg}>Loading history...</div>
-      ) : history.length === 0 ? (
+      ) : filteredTimeline.length === 0 ? (
         <div style={hs.emptyBox}>
           <div style={hs.emptyIcon}>🕐</div>
           <div style={hs.emptyTitle}>No consultation history</div>
-          <div style={hs.emptySub}>Your medical history will appear after completed consultations</div>
+          <div style={hs.emptySub}>No entries found for current filters</div>
         </div>
       ) : (
         <div style={hs.timeline}>
-          {[...history].reverse().map((h, i) => (
+          {filteredTimeline.map((h, i) => (
             <div key={i} style={hs.item}>
               {/* Timeline dot */}
               <div style={hs.dotCol}>
-                <div style={hs.dot} />
-                {i < history.length - 1 && <div style={hs.line} />}
+                <div style={{ ...hs.dot, background: itemAccent(h.type) }} />
+                {i < filteredTimeline.length - 1 && <div style={hs.line} />}
               </div>
 
               {/* Content */}
               <div style={hs.content}>
                 <div style={hs.contentHead}>
                   <div>
-                    <div style={hs.doctorName}>Dr. {h.doctorName}</div>
-                    <div style={hs.specialty}>{h.specialty}</div>
+                    <div style={hs.doctorName}>{h.doctorName ? `Dr. ${h.doctorName}` : 'Healthcare Record'}</div>
+                    <div style={hs.specialty}>{h.specialty || (h.type || 'entry').toUpperCase()}</div>
                   </div>
                   <div style={hs.dateTag}>
-                    {h.date ? new Date(h.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                    {formatDate(h.date)}
                   </div>
                 </div>
 
-                {h.diagnosis && (
+                <div style={hs.title}>{h.title || 'Medical update'}</div>
+
+                {h.details?.diagnosis && (
                   <div style={hs.diagBox}>
                     <span style={hs.diagLabel}>Diagnosis</span>
-                    <span style={hs.diagText}>{h.diagnosis}</span>
+                    <span style={hs.diagText}>{h.details.diagnosis}</span>
                   </div>
                 )}
 
-                {h.notes && (
+                {h.details?.notes && (
                   <div style={hs.notesBox}>
                     <span style={hs.notesLabel}>Notes</span>
-                    <p style={hs.notesText}>{h.notes}</p>
+                    <p style={hs.notesText}>{h.details.notes}</p>
+                  </div>
+                )}
+
+                {h.type === 'prescription' && Array.isArray(h.details?.medicines) && h.details.medicines.length > 0 && (
+                  <div style={hs.medicineRow}>
+                    {h.details.medicines.slice(0, 3).map((m, idx) => (
+                      <span key={idx} style={hs.medicinePill}>{m.name}</span>
+                    ))}
+                    {h.details.medicines.length > 3 && (
+                      <span style={hs.morePill}>+{h.details.medicines.length - 3} more</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -202,6 +300,13 @@ const s = {
 const hs = {
   error:      { background: '#fff0f0', color: '#cc0000', padding: '12px 16px', borderRadius: 10, marginBottom: 16, fontSize: 13 },
   msg:        { color: '#7a92aa', fontSize: 14, padding: '20px 0' },
+  filters:    { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 },
+  select:     { height: 38, borderRadius: 10, border: '1px solid #d9e4f2', padding: '0 10px', fontSize: 13, color: '#0b1f3a', background: '#fff' },
+  dateInput:  { height: 38, borderRadius: 10, border: '1px solid #d9e4f2', padding: '0 10px', fontSize: 13, color: '#0b1f3a', background: '#fff' },
+  clearBtn:   { height: 38, borderRadius: 10, border: '1px solid #d9e4f2', padding: '0 12px', fontSize: 13, color: '#4a6080', background: '#fff', cursor: 'pointer', fontWeight: 600 },
+  summaryGrid:{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 18 },
+  summaryCard:{ background: '#fff', border: '1px solid #e4ecf7', borderRadius: 12, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#0b1f3a' },
+  summaryLabel:{ fontSize: 12, color: '#7a92aa', fontWeight: 600 },
   emptyBox:   { textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: 14, border: '1px solid #e4ecf7' },
   emptyIcon:  { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 16, fontWeight: 700, color: '#0b1f3a', marginBottom: 8 },
@@ -213,6 +318,7 @@ const hs = {
   line:       { width: 2, flex: 1, background: '#e4ecf7', margin: '4px 0' },
   content:    { flex: 1, background: '#fff', border: '1px solid #e4ecf7', borderRadius: 14, padding: 20, marginBottom: 16 },
   contentHead:{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  title:      { fontSize: 14, fontWeight: 700, color: '#0b1f3a', marginBottom: 10 },
   doctorName: { fontSize: 15, fontWeight: 700, color: '#0b1f3a' },
   specialty:  { fontSize: 12, color: '#1a56db', fontWeight: 600, marginTop: 3 },
   dateTag:    { fontSize: 12, color: '#7a92aa', background: '#f0f4f9', padding: '4px 10px', borderRadius: 20, fontWeight: 500, whiteSpace: 'nowrap' },
@@ -222,4 +328,7 @@ const hs = {
   notesBox:   { background: '#f8faff', borderRadius: 8, padding: '10px 14px' },
   notesLabel: { fontSize: 11, fontWeight: 700, color: '#7a92aa', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 },
   notesText:  { fontSize: 13, color: '#4a6080', lineHeight: 1.6, margin: 0 },
+  medicineRow:{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 },
+  medicinePill:{ fontSize: 11, background: '#e8f7ef', color: '#166534', padding: '4px 8px', borderRadius: 20, fontWeight: 600 },
+  morePill:   { fontSize: 11, background: '#f0f4f9', color: '#4a6080', padding: '4px 8px', borderRadius: 20, fontWeight: 600 },
 };

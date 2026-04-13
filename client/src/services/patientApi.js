@@ -77,6 +77,11 @@ export const deletePatientReport = async (reportId) => {
   return response.data;
 };
 
+export const getPatientMedicalHistory = async () => {
+  const response = await api.get('/patients/medical-history');
+  return response.data;
+};
+
 export const getDoctorSharedReports = async () => {
   const response = await api.get('/patients/reports/shared/me');
   return response.data;
