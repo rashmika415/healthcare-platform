@@ -189,6 +189,78 @@ exports.getMedicalHistory = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────
+// GET /patients/medical-history
+// Aggregated timeline for logged-in patient (read-only)
+// ─────────────────────────────────────────────────────
+exports.getMedicalHistoryOverview = async (req, res) => {
+  try {
+    const patient = await Patient
+      .findOne({ userId: req.user.id })
+      .select('medicalHistory prescriptions');
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const historyItems = (patient.medicalHistory || []).map((h) => ({
+      type: 'history',
+      date: h?.date || null,
+      title: h?.diagnosis || 'Medical history update',
+      data: h,
+    }));
+
+    const rxItems = (patient.prescriptions || []).map((p) => ({
+      type: 'prescription',
+      date: p?.issuedAt || null,
+      title: p?.doctorName ? `Prescription by ${p.doctorName}` : 'Prescription',
+      data: p,
+    }));
+
+    const timeline = sortByDateDesc([...historyItems, ...rxItems].map((item) => ({
+      ...item,
+      // normalize date key for sorting helper
+      date: item.date,
+    })));
+
+    return res.status(200).json({
+      count: timeline.length,
+      timeline,
+    });
+  } catch (err) {
+    console.error('getMedicalHistoryOverview error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// GET /patients/emails
+// Used by doctor prescription UI dropdown
+// ─────────────────────────────────────────────────────
+exports.getAllPatientEmails = async (req, res) => {
+  try {
+    if (req.user?.role && !['doctor', 'admin'].includes(String(req.user.role))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const patients = await Patient.find({})
+      .select('name email userId')
+      .sort({ createdAt: -1 })
+      .limit(500);
+
+    return res.status(200).json({
+      patients: (patients || []).map((p) => ({
+        name: p.name,
+        email: p.email,
+        userId: p.userId,
+      })),
+    });
+  } catch (err) {
+    console.error('getAllPatientEmails error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 
 // ─────────────────────────────────────────────────────
 // POST /patients/internal/add-prescription
@@ -1082,155 +1154,5 @@ exports.deleteReport = async (req, res) => {
   } catch (err) {
     console.error('deleteReport error:', err.message);
     res.status(500).json({ error: err.message });
-  }
-};
-
-
-// ─────────────────────────────────────────────────────
-// GET /patients/medical-history
-// Aggregated medical history timeline for logged-in patient
-// ─────────────────────────────────────────────────────
-exports.getMedicalHistoryOverview = async (req, res) => {
-  try {
-    const userId = String(req.user.id || '').trim();
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const upstreamHeaders = {
-      'x-user-id': req.headers['x-user-id'] || req.user.id,
-      'x-user-role': req.headers['x-user-role'] || req.user.role,
-      'x-user-email': req.headers['x-user-email'] || req.user.email,
-      'x-user-name': req.headers['x-user-name'] || req.user.name
-    };
-
-    if (req.headers['x-user-verified'] !== undefined) {
-      upstreamHeaders['x-user-verified'] = req.headers['x-user-verified'];
-    }
-
-    const patient = await Patient
-      .findOne({ userId })
-      .select('userId name email bloodGroup dateOfBirth gender medicalHistory medicalReports');
-
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found' });
-    }
-
-    const [prescriptionsResult, appointmentsResult] = await Promise.allSettled([
-      axios.get(
-        `${doctorServiceBaseUrl}/prescriptions/patient/${encodeURIComponent(userId)}`,
-        { headers: upstreamHeaders, timeout: 10000 }
-      ),
-      axios.get(
-        `${appointmentServiceBaseUrl}/appointments/patient/${encodeURIComponent(userId)}`,
-        { timeout: 10000 }
-      )
-    ]);
-
-    const prescriptions = prescriptionsResult.status === 'fulfilled'
-      ? (prescriptionsResult.value?.data?.prescriptions || [])
-      : [];
-
-    const appointments = appointmentsResult.status === 'fulfilled'
-      ? (appointmentsResult.value?.data?.appointments || [])
-      : [];
-
-    const historyItems = Array.isArray(patient.medicalHistory) ? patient.medicalHistory : [];
-    const reports = Array.isArray(patient.medicalReports) ? patient.medicalReports : [];
-
-    const timeline = [];
-
-    for (const item of historyItems) {
-      timeline.push({
-        id: item._id?.toString?.() || `history-${timeline.length + 1}`,
-        type: 'history',
-        date: item.date || item.createdAt || null,
-        doctorName: item.doctorName || '',
-        specialty: item.specialty || '',
-        title: item.diagnosis ? `Diagnosis: ${item.diagnosis}` : 'Consultation note',
-        details: {
-          diagnosis: item.diagnosis || '',
-          notes: item.notes || '',
-          appointmentId: item.appointmentId || ''
-        }
-      });
-    }
-
-    for (const rx of prescriptions) {
-      timeline.push({
-        id: rx._id?.toString?.() || `prescription-${timeline.length + 1}`,
-        type: 'prescription',
-        date: rx.createdAt || rx.updatedAt || null,
-        doctorName: rx.doctorName || '',
-        specialty: '',
-        title: `Prescription (${Array.isArray(rx.medicines) ? rx.medicines.length : 0} medicines)`,
-        details: {
-          diagnosis: rx.diagnosis || '',
-          instructions: rx.instructions || '',
-          status: rx.status || '',
-          medicines: Array.isArray(rx.medicines) ? rx.medicines : []
-        }
-      });
-    }
-
-    for (const appt of appointments) {
-      timeline.push({
-        id: appt._id?.toString?.() || `appointment-${timeline.length + 1}`,
-        type: 'appointment',
-        date: appt.date || appt.createdAt || null,
-        doctorName: appt.doctorName || '',
-        specialty: appt.specialization || '',
-        title: `Appointment ${appt.status ? `(${appt.status})` : ''}`.trim(),
-        details: {
-          time: appt.time || '',
-          notes: appt.notes || '',
-          paymentStatus: appt.paymentStatus || ''
-        }
-      });
-    }
-
-    for (const report of reports) {
-      if (report.status === 'deleted') continue;
-      timeline.push({
-        id: report._id?.toString?.() || `report-${timeline.length + 1}`,
-        type: 'report',
-        date: report.reportDate || report.uploadedAt || null,
-        doctorName: '',
-        specialty: '',
-        title: report.title || report.filename || 'Medical report',
-        details: {
-          reportType: report.reportType || 'other',
-          hospitalOrLabName: report.hospitalOrLabName || '',
-          isCritical: Boolean(report.isCritical),
-          url: report.url || ''
-        }
-      });
-    }
-
-    const sortedTimeline = sortByDateDesc(timeline);
-
-    const summary = {
-      totalEntries: sortedTimeline.length,
-      appointments: appointments.length,
-      prescriptions: prescriptions.length,
-      reports: reports.filter((r) => r.status !== 'deleted').length,
-      historyNotes: historyItems.length
-    };
-
-    return res.status(200).json({
-      patient: {
-        userId: patient.userId,
-        name: patient.name,
-        email: patient.email,
-        bloodGroup: patient.bloodGroup,
-        dateOfBirth: patient.dateOfBirth,
-        gender: patient.gender
-      },
-      summary,
-      timeline: sortedTimeline
-    });
-  } catch (err) {
-    console.error('getMedicalHistoryOverview error:', err.message);
-    return res.status(500).json({ error: 'Failed to fetch medical history overview' });
   }
 };

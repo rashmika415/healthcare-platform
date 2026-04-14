@@ -10,6 +10,7 @@ router.post('/',          ctrl.createPrescription);
 router.get('/',           ctrl.getDoctorPrescriptions);
 router.get('/patient/:patientUserId', ctrl.getPatientPrescriptions);
 router.get('/:id',        ctrl.getPrescriptionById);
+router.put('/:id',        ctrl.updatePrescription);
 router.patch('/:id/status', ctrl.updatePrescriptionStatus);
 router.delete('/:id',     ctrl.deletePrescription);
 

@@ -1,25 +1,62 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../../services/api";
 import { Plus, Trash2, Pill, User, FileText, CheckCircle, XCircle, ChevronDown } from "lucide-react";
 
 const FREQUENCIES = ["Once daily", "Twice daily", "Three times daily", "Four times daily", "As needed"];
 
-export default function PrescriptionForm({ patientUserId: initialPatientId, patientName: initialPatientName, onSuccess }) {
-  const [patientUserId, setPatientUserId] = useState(initialPatientId || "");
+export default function PrescriptionForm({ patientEmail: initialPatientEmail, patientName: initialPatientName, onSuccess }) {
+  const [patientEmail, setPatientEmail] = useState(initialPatientEmail || "");
   const [patientName,   setPatientName]   = useState(initialPatientName || "");
   const [diagnosis,     setDiagnosis]     = useState("");
   const [instructions,  setInstructions]  = useState("");
   const [loading,       setLoading]       = useState(false);
   const [message,       setMessage]       = useState(null);
+  const [patientEmails, setPatientEmails] = useState([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   const [medicines, setMedicines] = useState([
     { name: "", dosage: "", duration: "", frequency: "Once daily" }
   ]);
 
   useEffect(() => {
-    if (initialPatientId)   setPatientUserId(initialPatientId);
+    if (initialPatientEmail) setPatientEmail(initialPatientEmail);
     if (initialPatientName) setPatientName(initialPatientName);
-  }, [initialPatientId, initialPatientName]);
+  }, [initialPatientEmail, initialPatientName]);
+
+  useEffect(() => {
+    fetchPatientEmails();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchPatientEmails = async () => {
+    try {
+      setLoadingEmails(true);
+      const res = await api.get("/patients/emails");
+      setPatientEmails(res.data.patients || []);
+    } catch (err) {
+      console.error("Failed to fetch patient emails:", err);
+    } finally {
+      setLoadingEmails(false);
+    }
+  };
+
+  const handleEmailSelect = (email, name) => {
+    setPatientEmail(email);
+    setPatientName(name);
+    setShowDropdown(false);
+  };
 
   const addMedicine = () =>
     setMedicines([...medicines, { name: "", dosage: "", duration: "", frequency: "Once daily" }]);
@@ -39,7 +76,7 @@ export default function PrescriptionForm({ patientUserId: initialPatientId, pati
   };
 
   const handleSubmit = async () => {
-    if (!patientUserId) return showMessage("error", "Patient ID is required.");
+    if (!patientEmail) return showMessage("error", "Patient email is required.");
     for (const m of medicines) {
       if (!m.name || !m.dosage || !m.duration)
         return showMessage("error", "Fill all medicine fields.");
@@ -47,7 +84,7 @@ export default function PrescriptionForm({ patientUserId: initialPatientId, pati
     try {
       setLoading(true);
       const res = await api.post("/doctor/prescriptions", {
-        patientUserId,
+        patientEmail,
         patientName,
         medicines,
         instructions,
@@ -57,14 +94,33 @@ export default function PrescriptionForm({ patientUserId: initialPatientId, pati
       const createdPrescription = res?.data?.prescription ?? res?.data;
       showMessage("success", "Prescription sent successfully!");
       // Reset
-      if (!initialPatientId) setPatientUserId("");
+      if (!initialPatientEmail) setPatientEmail("");
       setPatientName("");
       setDiagnosis("");
       setInstructions("");
       setMedicines([{ name: "", dosage: "", duration: "", frequency: "Once daily" }]);
       if (onSuccess) onSuccess(createdPrescription);
     } catch (err) {
-      showMessage("error", err.response?.data?.error || "Failed to send prescription.");
+      console.error("Create prescription failed:", err);
+      const status = err.response?.status;
+      const data = err.response?.data;
+      const backendError = data?.error || data?.message;
+      const backendDetails = data?.details;
+
+      // Hide legacy backend validation wording (patientUserId + medicines) from doctor UI.
+      if (typeof backendError === "string" && /patientuser(id)?\s+and\s+medicines\s+are\s+required/i.test(backendError)) {
+        return showMessage("error", "Failed to send prescription.");
+      }
+
+      // If server didn't respond (gateway/service down, CORS, network)
+      if (!err.response) {
+        return showMessage("error", err.message || "Network error. Please start the backend.");
+      }
+
+      if (backendError && backendDetails) {
+        return showMessage("error", `${backendError} (${backendDetails})`);
+      }
+      showMessage("error", backendError || `Request failed (${status})`);
     } finally {
       setLoading(false);
     }
@@ -92,15 +148,62 @@ export default function PrescriptionForm({ patientUserId: initialPatientId, pati
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1 block">Patient ID *</label>
-            <input
-              type="text"
-              value={patientUserId}
-              onChange={e => setPatientUserId(e.target.value)}
-              disabled={!!initialPatientId}
-              placeholder="Enter Patient User ID"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition"
-            />
+            <label className="text-xs font-semibold text-slate-500 mb-1 block">Patient Email *</label>
+            <div className="relative" ref={dropdownRef}>
+              <input
+                type="email"
+                value={patientEmail}
+                onChange={e => {
+                  setPatientEmail(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                disabled={!!initialPatientEmail}
+                placeholder="Enter patient email address or select from dropdown"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition"
+              />
+              {!initialPatientEmail && (
+                <button
+                  type="button"
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 transition"
+                >
+                  <ChevronDown size={16} className={`transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+              
+              {/* Dropdown */}
+              {showDropdown && !initialPatientEmail && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto">
+                  {loadingEmails ? (
+                    <div className="px-3 py-4 text-center text-sm text-slate-500">
+                      Loading patient emails...
+                    </div>
+                  ) : patientEmails.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-sm text-slate-500">
+                      No patients found
+                    </div>
+                  ) : (
+                    patientEmails
+                      .filter(patient => 
+                        patient.email.toLowerCase().includes(patientEmail.toLowerCase()) ||
+                        patient.name.toLowerCase().includes(patientEmail.toLowerCase())
+                      )
+                      .map((patient, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => handleEmailSelect(patient.email, patient.name)}
+                          className="w-full px-3 py-2.5 text-left hover:bg-slate-50 transition text-sm border-b border-slate-100 last:border-b-0"
+                        >
+                          <div className="font-medium text-slate-800">{patient.name}</div>
+                          <div className="text-slate-500">{patient.email}</div>
+                        </button>
+                      ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="text-xs font-semibold text-slate-500 mb-1 block">Patient Name</label>

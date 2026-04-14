@@ -257,7 +257,15 @@ export default function AppointmentResults() {
                                       type="button"
                                       className="px-4 py-2 rounded-xl bg-[#001836] bg-gradient-to-br from-[#001836] to-[#002d5b] text-white text-xs font-extrabold shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-transform"
                                       onClick={() => {
-                                        alert("Booking flow is not implemented yet (appointment-service).");
+                                        navigate('/patient/add-appointment', {
+                                          state: {
+                                            doctorId: d._id,
+                                            doctorName: d.name,
+                                            specialization: d.specialization,
+                                            appointmentDate: s.date,
+                                            appointmentTime: s.startTime,
+                                          },
+                                        });
                                       }}
                                     >
                                       Book

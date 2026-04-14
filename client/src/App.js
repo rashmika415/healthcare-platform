@@ -2,6 +2,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import DashboardRedirect from './components/DashboardRedirect';
+import InitialHomeRedirect from './components/InitialHomeRedirect';
 
 // Public pages
 import LandingPage  from './pages/public/LandingPage';
@@ -39,6 +41,9 @@ import AddAppointment from './components/appointment/AddAppointment';
 import AppointmentDashboard from './components/appointment/AppointmentDashboard';
 import ViewAppointment from './components/appointment/ViewAppointment';
 
+// Payment page
+import Payment from './pages/payment/Payment';
+
 // // Admin pages
 // import AdminDashboard from './pages/admin/AdminDashboard';
 
@@ -46,12 +51,14 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <InitialHomeRedirect />
         <Routes>
 
           {/* ── Public ───────────────────────────── */}
           <Route path="/"         element={<LandingPage />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/dashboard" element={<DashboardRedirect />} />
           <Route path="/appointments" element={<AppointmentSearch />} />
           <Route path="/appointments/results" element={<AppointmentResults />} />
           <Route path="/doctors/:doctorId" element={<DoctorPublicProfile />} />
@@ -74,7 +81,7 @@ export default function App() {
   <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
 } />
 
-          ── Patient ────────────────────────────
+          {/* ── Patient ──────────────────────────── */}
           {/* ── Patient routes ── */}
 <Route path="/patient/setup" element={
   <PrivateRoute role="patient"><PatientSetup /></PrivateRoute>
@@ -127,24 +134,42 @@ export default function App() {
           {/* Video Service standalone test page (your part) */}
           <Route path="/video-test" element={<VideoServiceTest />} />
 
+            {/* Appointment routes */}
+            <Route
+              path="/patient/appointments"
+              element={
+                <PrivateRoute role="patient">
+                  <AppointmentDashboard />
+                </PrivateRoute>
+              }
+            />
 
-          {/* Appointment routes */}
-          <Route path="/patient/appointments" element={
-            <PrivateRoute role="patient">
-              <AppointmentDashboard />
-            </PrivateRoute>
-          } />
+            {/* Payment route */}
+            <Route
+              path="/payment"
+              element={
+                <PrivateRoute role="patient">
+                  <Payment />
+                </PrivateRoute>
+              }
+            />
 
-          <Route path="/patient/add-appointment" element={
-            <PrivateRoute role="patient">
-              <AddAppointment />
-            </PrivateRoute>
-          } />
+            {/* Add Appointment */}
+            <Route
+              path="/patient/add-appointment"
+              element={
+                <PrivateRoute role="patient">
+                  <AddAppointment />
+                </PrivateRoute>
+              }
+            />
 
-          {/* ── Admin ──────────────────────────────
+          {/* ── Admin ────────────────────────────── */}
+          {/*
           <Route path="/admin/dashboard" element={
             <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
           }/>
+          */}
 
           {/* ── Catch all ────────────────────────── */}
           <Route path="*" element={<Navigate to="/" />} />
