@@ -140,7 +140,6 @@ export default function DoctorDashboard() {
   const [stats, setStats]               = useState({ total: 0, approved: 0, pending: 0 });
   const [appointments, setAppointments] = useState([]);
   const [selected, setSelected]         = useState(null);
-  const [loading, setLoading]           = useState(true);
 
   const user = getStoredUser();
 
@@ -159,8 +158,6 @@ export default function DoctorDashboard() {
       if (data.length > 0) setSelected(data[0]);
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
