@@ -28,7 +28,6 @@ function CheckoutForm() {
 
   const appointmentId = location.state?.appointmentId;
 
-  const [amount, setAmount] = useState(0);
   const [paymentId, setPaymentId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -42,7 +41,6 @@ function CheckoutForm() {
           { appointmentId }
         );
 
-        setAmount(res.data.amount || 0);
         setPaymentId(res.data.paymentId);
         setClientSecret(res.data.clientSecret || "");
         setErrorMessage(

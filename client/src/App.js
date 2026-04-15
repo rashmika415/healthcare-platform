@@ -39,7 +39,6 @@ import VideoServiceTest from './pages/video/VideoServiceTest';
 // //Appointment pages
 import AddAppointment from './components/appointment/AddAppointment';
 import AppointmentDashboard from './components/appointment/AppointmentDashboard';
-import ViewAppointment from './components/appointment/ViewAppointment';
 
 // Payment page
 import Payment from './pages/payment/Payment';

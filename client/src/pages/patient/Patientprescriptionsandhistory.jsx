@@ -3,6 +3,96 @@ import { useEffect, useState } from 'react';
 import api from '../../services/api';
 import PatientLayout from './Patientlayout ';
 
+const getStoredUser = () => {
+  try {
+    const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseHistoryResponse = (payload) => {
+  const root = payload?.data && (payload.data.timeline || payload.data.history)
+    ? payload.data
+    : payload || {};
+
+  const timeline = Array.isArray(root.timeline)
+    ? root.timeline
+    : Array.isArray(root.history)
+      ? root.history
+      : [];
+
+  return {
+    timeline,
+    summary: root.summary || null
+  };
+};
+
+const dedupeTimeline = (items) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    const details = item?.details || item?.data || {};
+    const key = [
+      item?.type || 'history',
+      item?.date || details?.date || '',
+      item?.title || '',
+      item?.doctorName || details?.doctorName || details?.doctor || '',
+    ].join('|');
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const buildFallbackTimeline = async () => {
+  const user = getStoredUser();
+  const patientUserId = String(user?.id ?? user?._id ?? user?.userId ?? '').trim();
+
+  const [rxResult, apptResult] = await Promise.allSettled([
+    api.get('/patients/prescriptions'),
+    patientUserId
+      ? api.get(`/appointments/patient/${encodeURIComponent(patientUserId)}`)
+      : Promise.resolve({ data: { appointments: [] } })
+  ]);
+
+  const prescriptions = rxResult.status === 'fulfilled'
+    ? (rxResult.value?.data?.prescriptions || [])
+    : [];
+
+  const appointments = apptResult.status === 'fulfilled'
+    ? (apptResult.value?.data?.appointments || [])
+    : [];
+
+  const prescriptionTimeline = prescriptions.map((p) => ({
+    type: 'prescription',
+    date: p.issuedAt || p.createdAt || p.date || null,
+    title: p.doctorName ? `Prescription by ${p.doctorName}` : 'Prescription',
+    doctorName: p.doctorName || '',
+    specialty: p.specialty || '',
+    data: {
+      medicines: p.medicines || [],
+      instructions: p.instructions || '',
+      diagnosis: p.diagnosis || ''
+    }
+  }));
+
+  const appointmentTimeline = appointments.map((a) => ({
+    type: 'appointment',
+    date: a.date || a.createdAt || a.updatedAt || null,
+    title: a.doctorName ? `Appointment with ${a.doctorName}` : 'Appointment',
+    doctorName: a.doctorName || '',
+    specialty: a.specialization || a.specialty || '',
+    data: {
+      diagnosis: a.diagnosis || '',
+      notes: a.notes || a.reason || a.description || '',
+    }
+  }));
+
+  return dedupeTimeline([...prescriptionTimeline, ...appointmentTimeline]);
+};
+
 export default function PatientPrescriptions() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -141,13 +231,48 @@ export function PatientHistory() {
   const [toDate, setToDate] = useState('');
 
   useEffect(() => {
-    api.get('/patients/medical-history')
-      .then((r) => {
-        setTimeline(r.data.timeline || []);
-        setSummary(r.data.summary || null);
-      })
-      .catch(() => setError('Failed to load history'))
-      .finally(() => setLoading(false));
+    const loadHistory = async () => {
+      try {
+        const response = await api.get('/patients/medical-history');
+        const parsed = parseHistoryResponse(response.data);
+        let mergedTimeline = parsed.timeline;
+
+        if (mergedTimeline.length === 0) {
+          mergedTimeline = await buildFallbackTimeline();
+        }
+
+        setTimeline(dedupeTimeline(mergedTimeline));
+        setSummary(parsed.summary);
+      } catch {
+        try {
+          // Fallback for older patient-service route shape.
+          const fallbackResponse = await api.get('/patients/history');
+          const parsedFallback = parseHistoryResponse(fallbackResponse.data);
+          let mergedTimeline = parsedFallback.timeline;
+
+          if (mergedTimeline.length === 0) {
+            mergedTimeline = await buildFallbackTimeline();
+          }
+
+          setTimeline(dedupeTimeline(mergedTimeline));
+          setSummary(parsedFallback.summary);
+        } catch {
+          try {
+            const fallbackTimeline = await buildFallbackTimeline();
+            setTimeline(dedupeTimeline(fallbackTimeline));
+            if (fallbackTimeline.length === 0) {
+              setError('Failed to load history');
+            }
+          } catch {
+            setError('Failed to load history');
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHistory();
   }, []);
 
   const toDateValue = (value) => {
@@ -158,16 +283,17 @@ export function PatientHistory() {
 
   const inferType = (item) => {
     if (item?.type) return item.type;
-    if (Array.isArray(item?.details?.medicines) || Array.isArray(item?.medicines)) return 'prescription';
-    if (item?.details?.diagnosis || item?.details?.notes) return 'history';
+    const details = item?.details || item?.data || {};
+    if (Array.isArray(details?.medicines) || Array.isArray(item?.medicines)) return 'prescription';
+    if (details?.diagnosis || details?.notes) return 'history';
     return 'history';
   };
 
   const normalizedTimeline = timeline
     .map((item) => {
       const type = inferType(item);
-      const date = toDateValue(item.date || item.createdAt || item.updatedAt);
-      const details = item.details || {};
+      const details = item.details || item.data || {};
+      const date = toDateValue(item.date || details.date || item.createdAt || details.createdAt || item.updatedAt || details.updatedAt);
       const medicines = Array.isArray(details.medicines)
         ? details.medicines
         : Array.isArray(item.medicines)
@@ -175,14 +301,16 @@ export function PatientHistory() {
           : [];
       const diagnosis = details.diagnosis || item.diagnosis || '';
       const notes = details.notes || details.description || item.notes || '';
+      const doctorName = item.doctorName || details.doctorName || details.doctor || '';
+      const specialty = item.specialty || details.specialty || '';
 
       return {
         ...item,
         type,
         displayDate: date,
         displayTitle: item.title || diagnosis || `${type.charAt(0).toUpperCase()}${type.slice(1)} update`,
-        displayDoctor: item.doctorName ? `Dr. ${item.doctorName}` : 'Healthcare Record',
-        displaySpecialty: item.specialty || (type === 'history' ? 'Consultation Notes' : type.toUpperCase()),
+        displayDoctor: doctorName ? `Dr. ${doctorName}` : 'Healthcare Record',
+        displaySpecialty: specialty || (type === 'history' ? 'Consultation Notes' : type.toUpperCase()),
         diagnosis,
         notes,
         medicines
