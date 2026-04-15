@@ -2,6 +2,31 @@
 const Appointment = require("../module/appintmentModule");
 const axios = require("axios");
 
+const DOCTOR_SERVICE_URL =
+    process.env.DOCTOR_SERVICE_URL || "http://localhost:3002";
+
+/** Public list for booking UI — server-side call avoids browser CORS to doctor service */
+const getVerifiedDoctorsForBooking = async (req, res) => {
+    try {
+        const { data } = await axios.get(
+            `${DOCTOR_SERVICE_URL}/doctors-list`,
+            { timeout: 15000 }
+        );
+        const list = Array.isArray(data) ? data : [];
+        return res.status(200).json(list);
+    } catch (error) {
+        console.error("getVerifiedDoctorsForBooking:", error.message);
+        const status = error.response?.status || 503;
+        const msg =
+            error.response?.data?.error ||
+            error.message ||
+            "Doctor service unavailable";
+        return res.status(status >= 400 && status < 600 ? status : 503).json({
+            error: msg,
+        });
+    }
+};
+
 // Get all appointments
 const getallappointments = async (req, res) => {
     try {
@@ -18,7 +43,7 @@ const getallappointments = async (req, res) => {
 
                 // CALL Doctor Service
                 const doctorRes = await axios.get(
-                    `http://localhost:3n002/doctors/${appt.doctorId}`
+                    `http://localhost:3002/doctors/${appt.doctorId}`
                 );
 
                 return {
@@ -37,11 +62,64 @@ const getallappointments = async (req, res) => {
     }
 };
 
+/** Appointments for one patient (stored fields only — no cross-service calls) */
+const getAppointmentsByPatientId = async (req, res) => {
+    try {
+        const { patientId } = req.params;
+        if (!patientId) {
+            return res.status(400).json({ message: "patientId is required" });
+        }
+        const raw = decodeURIComponent(String(patientId)).trim();
+        const or = [{ patientId: raw }];
+        if (raw.length === 24 && /^[a-fA-F0-9]+$/.test(raw)) {
+            or.push({ patientId: raw.toLowerCase() });
+        }
+        const appointments = await Appointment.find({ $or: or })
+            .sort({ createdAt: -1 })
+            .lean();
 
+        return res.status(200).json({ appointments });
+    } catch (error) {
+        console.error("getAppointmentsByPatientId:", error);
+        return res.status(500).json({ message: "Error fetching patient appointments" });
+    }
+};
+
+/** Appointments for one doctor (stored fields only — no cross-service calls) */
+const getAppointmentsByDoctorId = async (req, res) => {
+    try {
+        const { doctorId } = req.params;
+        if (!doctorId) {
+            return res.status(400).json({ message: "doctorId is required" });
+        }
+        const raw = decodeURIComponent(String(doctorId)).trim();
+        const or = [{ doctorId: raw }];
+        if (raw.length === 24 && /^[a-fA-F0-9]+$/.test(raw)) {
+            or.push({ doctorId: raw.toLowerCase() });
+        }
+        const appointments = await Appointment.find({ $or: or })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        return res.status(200).json({ appointments });
+    } catch (error) {
+        console.error("getAppointmentsByDoctorId:", error);
+        return res.status(500).json({ message: "Error fetching doctor appointments" });
+    }
+};
 
 //create appointment
 const createappointment = async (req, res) => {
-    const { patientId, doctorId, patientName, doctorName, specialization, date, time } = req.body;
+    const {
+        patientId,
+        doctorId,
+        patientName,
+        doctorName,
+        specialization,
+        date,
+        time,
+        notes,
+    } = req.body;
     let appointment;
     try {
         appointment = new Appointment({
@@ -51,7 +129,8 @@ const createappointment = async (req, res) => {
             doctorName,
             specialization,
             date,
-            time    
+            time,
+            notes,
         });
         await appointment.save();
     }
@@ -84,7 +163,18 @@ const getappointmentbyid = async (req, res) => {
 //update appointment
 const updateappointment = async (req, res) => {
     const id = req.params.id;
-    const { patientId, doctorId, patientName, doctorName, specialization, date, time } = req.body;
+    const {
+        patientId,
+        doctorId,
+        patientName,
+        doctorName,
+        specialization,
+        date,
+        time,
+        status,
+        paymentStatus,
+        notes,
+    } = req.body;
     let appointment;
     try {
         appointment = await Appointment.findByIdAndUpdate(id, { 
@@ -94,8 +184,11 @@ const updateappointment = async (req, res) => {
             doctorName,
             specialization,
             date,
-            time
-        });
+            time,
+            status,
+            paymentStatus,
+            notes,
+        }, { new: true });
     }   
     catch (error) {
         console.log(error);
@@ -128,3 +221,6 @@ exports.createappointment = createappointment;
 exports.updateappointment = updateappointment;
 exports.deleteappointment = deleteappointment;
 exports.getappointmentbyid = getappointmentbyid;
+exports.getVerifiedDoctorsForBooking = getVerifiedDoctorsForBooking;
+exports.getAppointmentsByPatientId = getAppointmentsByPatientId;
+exports.getAppointmentsByDoctorId = getAppointmentsByDoctorId;

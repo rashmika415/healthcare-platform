@@ -24,7 +24,7 @@ export default function AdminDashboard() {
 
       {/* Sidebar */}
       <aside style={s.sidebar}>
-        <div style={s.brand}><span style={s.dot}/>MediConnect</div>
+        <div style={s.brand}><span style={s.dot}/>Nexus Health</div>
         <div style={s.adminBadge}>Admin Panel</div>
         <nav style={s.nav}>
           {[

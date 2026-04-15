@@ -23,6 +23,29 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'api-gateway' });
 });
 
+// ── Public doctor browse/search (no token) ─────────────
+// Used by appointment search UI (patients/guests) to discover VERIFIED doctors.
+const publicDoctorProxy = createProxyMiddleware({
+  target: process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002',
+  changeOrigin: true,
+  pathRewrite: (path) => `/public${path}`,
+  proxyTimeout: 15000,
+  timeout: 15000,
+  on: {
+    proxyReq: (proxyReq, req, res) => {
+      fixRequestBody(proxyReq, req, res);
+    },
+    error: (err, req, res) => {
+      console.error('Proxy error:', err);
+      if (!res.headersSent) {
+        res.status(503).json({ error: 'Doctor service unavailable', details: err.message });
+      }
+    }
+  }
+});
+
+app.use('/public', publicDoctorProxy);
+
 // NOTE:
 // Do not parse JSON globally before proxy routes; that can consume request bodies
 // and cause downstream services to hang waiting for body bytes.
@@ -110,6 +133,30 @@ app.use('/patients',
   })
 );
 
+// Appointment service (patient booking, lists) — same paths as appointment-service on :3003
+app.use('/appointments',
+  createProxyMiddleware({
+    target: process.env.APPOINTMENT_SERVICE_URL || 'http://localhost:3003',
+    changeOrigin: true,
+    // Express strips the mount path (/appointments) from req.url.
+    // The appointment-service mounts routes at /appointments, so we must re-add it.
+    pathRewrite: (path) => `/appointments${path}`,
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error (appointments):', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Appointment service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
 app.use('/doctor',
   authMiddleware,
   createProxyMiddleware({
@@ -126,6 +173,10 @@ app.use('/doctor',
           proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
           proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
           proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
+          const verified = req.headers['x-user-verified'];
+          if (verified !== undefined && verified !== null) {
+            proxyReq.setHeader('x-user-verified', verified);
+          }
         }
         fixRequestBody(proxyReq, req, res);
       },

@@ -9,6 +9,14 @@ const Appointment = require("../module/appintmentModule");
 const appointmentController = require("../Controller/appointmentController");
 
 router.get("/getallappointments", appointmentController.getallappointments);
+router.get(
+    "/patient/:patientId",
+    appointmentController.getAppointmentsByPatientId
+);
+router.get(
+    "/doctor/:doctorId",
+    appointmentController.getAppointmentsByDoctorId
+);
 router.post("/createappointment", appointmentController.createappointment);
 router.get("/getappointmentbyid/:id", appointmentController.getappointmentbyid);
 router.put("/updateappointment/:id", appointmentController.updateappointment);

@@ -7,6 +7,12 @@ const role = require('../middleware/roleMiddleware');
 // Import controller
 const doctorController = require('../controllers/doctorController');
 
+// ── Public doctor browse/search (no auth) ─────────────
+router.get('/public/filters', doctorController.publicFilters);
+router.get('/public/doctors', doctorController.publicSearchDoctors);
+router.get('/public/doctors/:doctorId', doctorController.publicGetDoctorProfile);
+router.get('/internal/by-email/:email', authMiddleware, doctorController.internalGetDoctorByEmail);
+
 
 // 🔹 GET Doctor Profile
 router.get('/profile', authMiddleware, doctorController.getProfile);
@@ -35,9 +41,7 @@ router.get('/unverified', authMiddleware, doctorController.getUnverifiedDoctors)
 // ✅ GET VERIFIED DOCTORS (ADMIN)
 router.get('/verified', authMiddleware, doctorController.getVerifiedDoctors);
 
-
 // ✅ GET DOCTOR BY ID (ADMIN)
 router.get('/:doctorId', authMiddleware, doctorController.getDoctorById);
-
 
 module.exports = router;

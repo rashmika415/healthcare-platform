@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../services/api";
 import PrescriptionForm from "../../components/doctor/PrescriptionForm";
+import Sidebar from "../../components/doctor/Sidebar";
 
 const STATUS_STYLES = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -13,21 +14,129 @@ export default function DoctorAppointments() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
+  const [doctorProfileId, setDoctorProfileId] = useState("");
   
   // New states for modal
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
+  const getStoredUser = () => {
+    try {
+      const p = localStorage.getItem("authPersistence");
+      if (p === "local") return JSON.parse(localStorage.getItem("user")) || {};
+      return (
+        JSON.parse(sessionStorage.getItem("user")) ||
+        JSON.parse(localStorage.getItem("user")) ||
+        {}
+      );
+    } catch {
+      return {};
+    }
+  };
+
+  const doctorIdFromUser = (user) =>
+    String(user?.id ?? user?._id ?? user?.userId ?? user?.doctorId ?? "");
+
+  const resolveDoctorProfileId = async () => {
+    try {
+      const res = await api.get("/doctor/profile");
+      const id = String(res.data?._id || "").trim();
+      if (id) setDoctorProfileId(id);
+      return id || "";
+    } catch {
+      // Fallback: resolve by email (works even if profile not yet created in current session)
+      try {
+        const user = getStoredUser();
+        const email = String(user?.email || "").trim().toLowerCase();
+        if (!email) return "";
+        const res = await api.get(`/doctor/internal/by-email/${encodeURIComponent(email)}`);
+        const id = String(res.data?.doctor?._id || "").trim();
+        if (id) setDoctorProfileId(id);
+        return id || "";
+      } catch {
+        return "";
+      }
+    }
+  };
+
+  const normalizeStatus = (raw) => {
+    const s = String(raw || "").toLowerCase();
+    if (!s) return "pending";
+    if (s === "booked") return "pending";
+    if (s === "approved") return "accepted";
+    return s;
+  };
+
+  const mapAppointment = (a) => ({
+    ...a,
+    status: normalizeStatus(a.status),
+    timeSlot: a.timeSlot || a.time || "--",
+    patientUserId: a.patientUserId || a.patientId,
+  });
+
+  const fetchDoctorAppointments = async () => {
+    const user = getStoredUser();
+    // Booking saves doctorId as Doctor profile _id (not auth user id),
+    // so prefer using /doctor/profile._id when available.
+    const profileId =
+      doctorProfileId || (await resolveDoctorProfileId());
+    const doctorId = profileId || doctorIdFromUser(user);
+    if (!doctorId) {
+      setAppointments([]);
+      setLoading(false);
+      return;
+    }
+
+    // Primary: appointment-service (through gateway) so it matches booking flow.
+    try {
+      const res = await api.get(`/appointments/doctor/${encodeURIComponent(doctorId)}`);
+      const list = Array.isArray(res.data?.appointments) ? res.data.appointments : [];
+      setAppointments(list.map(mapAppointment));
+      return;
+    } catch {
+      // Fallback: older doctor-service route (if present in your setup).
+      const res = await api.get("/doctor/appointments");
+      const list = Array.isArray(res.data) ? res.data : (res.data?.appointments || []);
+      setAppointments((Array.isArray(list) ? list : []).map(mapAppointment));
+    }
+  };
+
   useEffect(() => {
-    api.get("/doctor/appointments")
-      .then(res => setAppointments(res.data || []))
-      .catch(() => setAppointments([]))
-      .finally(() => setLoading(false));
+    let mounted = true;
+    setLoading(true);
+
+    fetchDoctorAppointments()
+      .catch(() => {
+        if (mounted) setAppointments([]);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    const onChanged = () => {
+      setLoading(true);
+      fetchDoctorAppointments()
+        .catch(() => {})
+        .finally(() => mounted && setLoading(false));
+    };
+
+    // Allow other pages (booking/payment) to trigger refresh by dispatching this event.
+    window.addEventListener("appointments:changed", onChanged);
+    return () => {
+      mounted = false;
+      window.removeEventListener("appointments:changed", onChanged);
+    };
   }, []);
 
   const handleAction = async (id, status) => {
     try {
-      await api.patch(`/doctor/appointments/${id}`, { status });
+      // Primary: appointment-service update route
+      try {
+        await api.put(`/appointments/updateappointment/${id}`, { status });
+      } catch {
+        // Fallback: doctor-service route if configured
+        await api.patch(`/doctor/appointments/${id}`, { status });
+      }
       setAppointments(prev =>
         prev.map(a => a._id === id ? { ...a, status } : a)
       );
@@ -42,48 +151,59 @@ export default function DoctorAppointments() {
       : appointments.filter(a => a.status === filter);
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="flex min-h-screen bg-slate-50">
+      <Sidebar />
+      <div className="flex-1 p-6 overflow-auto">
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Appointments</h1>
-        <p className="text-gray-500 text-sm">Manage your patient bookings</p>
+        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Appointments</h1>
+        <p className="text-sm text-slate-400 mt-0.5">Manage your patient bookings</p>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-red-100 text-red-600 p-3 rounded-lg mb-4">
+        <div className="bg-rose-50 text-rose-600 border border-rose-200 p-3 rounded-xl mb-4 text-sm font-medium">
           {error}
         </div>
       )}
 
       {/* Filters */}
-      <div className="flex gap-2 mb-6 flex-wrap">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 mb-4">
+        <div className="flex gap-2 flex-wrap">
         {["all", "pending", "accepted", "rejected"].map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium border 
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all 
               ${filter === f
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
               }`}
           >
             {f}
           </button>
         ))}
+        </div>
       </div>
 
       {/* Loading / Empty */}
       {loading ? (
-        <div className="text-gray-500">Loading...</div>
+        <div className="flex items-center justify-center h-48 text-slate-400">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm">Loading appointments...</p>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white p-10 text-center rounded-xl shadow">
-          <div className="text-4xl mb-3">📅</div>
-          <h2 className="font-semibold text-lg text-gray-700">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center py-16 text-slate-400">
+          <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mb-3">
+            <span className="text-2xl">📅</span>
+          </div>
+          <h2 className="font-semibold text-base text-slate-700">
             No appointments
           </h2>
-          <p className="text-gray-400 text-sm">
+          <p className="text-slate-400 text-xs mt-1">
             You don’t have any {filter} appointments
           </p>
         </div>
@@ -94,28 +214,26 @@ export default function DoctorAppointments() {
           {filtered.map(ap => (
             <div
               key={ap._id}
-              className="bg-white p-5 rounded-xl shadow-sm border flex justify-between items-start"
+              className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex justify-between items-start gap-4"
             >
 
               {/* LEFT */}
               <div className="flex gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center font-bold text-blue-600">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-100 flex items-center justify-center font-bold text-blue-600 flex-shrink-0">
                   {ap.patientName?.charAt(0) || "P"}
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-gray-800">
+                  <h3 className="font-bold text-slate-800 text-sm">
                     {ap.patientName}
                   </h3>
 
-                  <p className="text-sm text-gray-500">
-                    📅 {ap.date ? new Date(ap.date).toLocaleDateString() : "--"}
-                    &nbsp; | &nbsp;
-                    🕐 {ap.timeSlot || "--"}
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {ap.date ? new Date(ap.date).toLocaleDateString() : "--"} • {ap.timeSlot || "--"}
                   </p>
 
                   {ap.reason && (
-                    <p className="text-xs text-gray-400 italic mt-1">
+                    <p className="text-xs text-slate-400 italic mt-1">
                       "{ap.reason}"
                     </p>
                   )}
@@ -127,7 +245,7 @@ export default function DoctorAppointments() {
 
                 {/* Status */}
                 <span
-                  className={`px-3 py-1 text-xs font-semibold rounded-full ${STATUS_STYLES[ap.status]}`}
+                  className={`px-3 py-1 text-xs font-bold rounded-full ${STATUS_STYLES[ap.status] || "bg-slate-100 text-slate-600"}`}
                 >
                   {ap.status}
                 </span>
@@ -137,14 +255,14 @@ export default function DoctorAppointments() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleAction(ap._id, "accepted")}
-                      className="px-3 py-1 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600"
+                      className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
                     >
                       Accept
                     </button>
 
                     <button
                       onClick={() => handleAction(ap._id, "rejected")}
-                      className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
+                      className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
                     >
                       Reject
                     </button>
@@ -158,7 +276,7 @@ export default function DoctorAppointments() {
                       setSelectedPatient(ap.patientUserId);
                       setShowModal(true);
                     }}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
                   >
                     Add Prescription
                   </button>
@@ -184,6 +302,7 @@ export default function DoctorAppointments() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

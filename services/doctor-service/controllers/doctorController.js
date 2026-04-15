@@ -18,10 +18,10 @@ exports.upsertProfile = async (req, res) => {
       return res.status(403).json({ error: 'Only doctors allowed' });
     }
 
-    const { specialization, experience, hospital, bio } = req.body || {};
+    const { specialization, experience, hospital, bio, consultationFee } = req.body || {};
 
-    if (!specialization || experience === undefined || !hospital || !bio) {
-      return res.status(400).json({ error: 'All fields are required: specialization, experience, hospital, bio' });
+    if (!specialization || experience === undefined || !hospital || !bio || consultationFee === undefined) {
+      return res.status(400).json({ error: 'All fields are required: specialization, experience, hospital, bio, consultationFee' });
     }
 
     const profileData = {
@@ -31,7 +31,8 @@ exports.upsertProfile = async (req, res) => {
       specialization,
       experience: Number(experience),
       hospital,
-      bio
+      bio,
+      consultationFee: Number(consultationFee),
     };
 
     const isNew = !(await Doctor.findOne({ userId: req.user.id }));
@@ -352,6 +353,107 @@ exports.getDoctorById = async (req, res) => {
 
   } catch (err) {
     console.error('Error in getDoctorById:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * 🌍 Public: Search verified doctors (for appointment booking)
+ * GET /public/doctors?name=&specialization=&hospital=
+ */
+exports.publicSearchDoctors = async (req, res) => {
+  try {
+    const { name, specialization, hospital } = req.query || {};
+
+    const filter = { isVerified: true };
+
+    if (name && String(name).trim()) {
+      filter.name = { $regex: String(name).trim(), $options: 'i' };
+    }
+    if (specialization && String(specialization).trim()) {
+      filter.specialization = String(specialization).trim();
+    }
+    if (hospital && String(hospital).trim()) {
+      filter.hospital = String(hospital).trim();
+    }
+
+    const doctors = await Doctor.find(filter)
+      .select('name email specialization hospital experience bio consultationFee isVerified userId')
+      .sort({ name: 1 });
+
+    return res.status(200).json({ doctors });
+  } catch (err) {
+    console.error('Error in publicSearchDoctors:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * 🌍 Public: Filters for appointment search dropdowns
+ * GET /public/filters
+ */
+exports.publicFilters = async (req, res) => {
+  try {
+    const [specializations, hospitals, names] = await Promise.all([
+      Doctor.distinct('specialization', { isVerified: true }),
+      Doctor.distinct('hospital', { isVerified: true }),
+      Doctor.distinct('name', { isVerified: true }),
+    ]);
+
+    return res.status(200).json({
+      specializations: (specializations || []).filter(Boolean).sort(),
+      hospitals: (hospitals || []).filter(Boolean).sort(),
+      doctorNames: (names || []).filter(Boolean).sort(),
+    });
+  } catch (err) {
+    console.error('Error in publicFilters:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * 🌍 Public: Get verified doctor profile
+ * GET /public/doctors/:doctorId
+ */
+exports.publicGetDoctorProfile = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const doctor = await Doctor.findById(doctorId).select(
+      'name specialization hospital experience bio consultationFee isVerified userId'
+    );
+
+    if (!doctor || !doctor.isVerified) {
+      return res.status(404).json({ error: 'Doctor not found' });
+    }
+
+    return res.status(200).json({ doctor });
+  } catch (err) {
+    console.error('Error in publicGetDoctorProfile:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * 🔒 Internal: Resolve verified doctor by email
+ * GET /internal/by-email/:email
+ */
+exports.internalGetDoctorByEmail = async (req, res) => {
+  try {
+    const email = String(req.params.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: 'email is required' });
+    }
+
+    const doctor = await Doctor.findOne({ email })
+      .select('userId name email specialization hospital isVerified');
+
+    if (!doctor) {
+      return res.status(404).json({ error: 'Doctor not found for this email' });
+    }
+
+    return res.status(200).json({ doctor });
+  } catch (err) {
+    console.error('Error in internalGetDoctorByEmail:', err);
     return res.status(500).json({ error: err.message });
   }
 };
