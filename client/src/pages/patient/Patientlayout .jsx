@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getPatientReports, markReportNotesRead } from '../../services/patientApi';
 
 const navItems = [
   { path: '/patient/dashboard', icon: 'DB', label: 'Dashboard' },
@@ -23,6 +24,9 @@ export default function PatientLayout({
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1120);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [noteItems, setNoteItems] = useState([]);
 
   const firstName = useMemo(() => {
     const full = user?.name || 'Patient';
@@ -48,6 +52,56 @@ export default function PatientLayout({
   useEffect(() => {
     if (!isMobile) setMenuOpen(false);
   }, [isMobile]);
+
+  useEffect(() => {
+    let active = true;
+    const loadNotes = async () => {
+      try {
+        setNotificationLoading(true);
+        const data = await getPatientReports({ page: 1, limit: 100, status: 'active' });
+        if (!active) return;
+        const reports = Array.isArray(data?.reports) ? data.reports : [];
+        const notes = reports
+          .flatMap((report) => {
+            const doctorNotes = Array.isArray(report?.doctorNotes) ? report.doctorNotes : [];
+            return doctorNotes.map((entry) => ({
+              reportId: report?._id,
+              reportTitle: report?.title || report?.filename || 'Report',
+              note: entry?.note || '',
+              doctorName: entry?.doctorName || 'Doctor',
+              createdAt: entry?.createdAt,
+              isRead: Boolean(entry?.isRead)
+            }));
+          })
+          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        setNoteItems(notes);
+      } catch {
+        if (active) setNoteItems([]);
+      } finally {
+        if (active) setNotificationLoading(false);
+      }
+    };
+
+    loadNotes();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const unreadCount = noteItems.filter((item) => !item.isRead).length;
+
+  const handleNotificationClick = async (item) => {
+    try {
+      if (item?.reportId) {
+        await markReportNotesRead(item.reportId);
+      }
+    } catch {
+      // Keep navigation behavior even if read sync fails.
+    } finally {
+      setNotificationOpen(false);
+      navigate('/patient/reports');
+    }
+  };
 
   const sidebarStyle = isMobile
     ? {
@@ -110,7 +164,45 @@ export default function PatientLayout({
               style={s.searchInput}
             />
             <div style={s.topIcons}>
-              <button type="button" className="patient-icon-btn" style={s.iconBtn} aria-label="Notifications">N</button>
+              <div style={s.notificationWrap}>
+                <button
+                  type="button"
+                  className="patient-icon-btn"
+                  style={s.iconBtn}
+                  aria-label="Notifications"
+                  onClick={() => setNotificationOpen((prev) => !prev)}
+                >
+                  🔔
+                  {unreadCount > 0 && <span style={s.notificationBadge}>{unreadCount > 99 ? '99+' : unreadCount}</span>}
+                </button>
+                {notificationOpen && (
+                  <div style={s.notificationPanel}>
+                    <div style={s.notificationHead}>Doctor Notes</div>
+                    {notificationLoading ? (
+                      <div style={s.notificationEmpty}>Loading...</div>
+                    ) : noteItems.length === 0 ? (
+                      <div style={s.notificationEmpty}>No doctor notes yet.</div>
+                    ) : (
+                      <div style={s.notificationList}>
+                        {noteItems.slice(0, 8).map((item, idx) => (
+                          <button
+                            key={`${item.reportId}-${item.createdAt || idx}`}
+                            type="button"
+                            style={{ ...s.notificationItem, ...(!item.isRead ? s.notificationItemUnread : {}) }}
+                            onClick={() => handleNotificationClick(item)}
+                          >
+                            <div style={s.notificationTitle}>{item.reportTitle}</div>
+                            <div style={s.notificationText}>{item.note || 'Doctor sent you a note.'}</div>
+                            <div style={s.notificationMeta}>
+                              Dr. {item.doctorName} {item.createdAt ? `• ${new Date(item.createdAt).toLocaleString()}` : ''}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <button type="button" className="patient-icon-btn" style={s.iconBtn} aria-label="Help">?</button>
               <button type="button" className="patient-icon-btn" style={s.iconBtn} aria-label="Settings" onClick={() => navigate('/patient/profile')}>*</button>
               <Link to="/patient/profile" style={s.profileLink}>
@@ -223,6 +315,81 @@ const s = {
   },
   topIcons: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' },
   iconBtn: { width: 28, height: 28, borderRadius: '50%', border: '1px solid #cfe0f0', background: '#ffffff', color: '#2f5371', fontSize: 14, cursor: 'pointer', lineHeight: 1 },
+  notificationWrap: { position: 'relative' },
+  notificationBadge: {
+    position: 'absolute',
+    right: -5,
+    top: -7,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 999,
+    background: '#cf2e2e',
+    color: '#ffffff',
+    border: '1px solid #ffffff',
+    fontSize: 9,
+    fontWeight: 700,
+    lineHeight: '14px',
+    textAlign: 'center',
+    padding: '0 3px'
+  },
+  notificationPanel: {
+    position: 'absolute',
+    right: 0,
+    top: 34,
+    width: 320,
+    maxWidth: 'min(90vw, 320px)',
+    border: '1px solid #d8e6f5',
+    borderRadius: 12,
+    background: '#ffffff',
+    boxShadow: '0 16px 36px rgba(3, 40, 88, 0.2)',
+    zIndex: 45,
+    overflow: 'hidden'
+  },
+  notificationHead: {
+    padding: '10px 12px',
+    borderBottom: '1px solid #e8f0f8',
+    fontSize: 12,
+    fontWeight: 800,
+    color: '#1e4260'
+  },
+  notificationList: {
+    display: 'flex',
+    flexDirection: 'column',
+    maxHeight: 360,
+    overflowY: 'auto'
+  },
+  notificationItem: {
+    border: 'none',
+    borderBottom: '1px solid #edf3fa',
+    background: '#ffffff',
+    padding: '10px 12px',
+    textAlign: 'left',
+    cursor: 'pointer'
+  },
+  notificationItemUnread: {
+    background: '#f5f9ff'
+  },
+  notificationTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#1a3d5b',
+    marginBottom: 4
+  },
+  notificationText: {
+    fontSize: 12,
+    color: '#33556f',
+    lineHeight: 1.35,
+    marginBottom: 4
+  },
+  notificationMeta: {
+    fontSize: 10,
+    color: '#6c869d'
+  },
+  notificationEmpty: {
+    padding: '12px',
+    fontSize: 12,
+    color: '#6c869d'
+  },
   profileLink: { display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', marginLeft: 6 },
   profileName: { fontSize: 11, fontWeight: 700, color: '#163854', textTransform: 'capitalize' },
   profileRole: { fontSize: 9, color: '#5e7b94', letterSpacing: 0.8 },

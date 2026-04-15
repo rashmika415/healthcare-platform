@@ -5,6 +5,7 @@ import {
   getPatientReportDownloadUrl,
   getPatientReports,
   getVerifiedDoctorsForSharing,
+  markReportNotesRead,
   uploadPatientReport
 } from '../../services/patientApi';
 import PatientLayout from './Patientlayout ';
@@ -28,6 +29,7 @@ export default function PatientReports() {
   const [error,     setError]     = useState('');
   const [success,   setSuccess]   = useState('');
   const [dragOver,  setDragOver]  = useState(false);
+  const [notesFor, setNotesFor] = useState(null);
   const fileRef = useRef();
 
   const fetchReports = () => {
@@ -99,6 +101,24 @@ export default function PatientReports() {
       fetchReports();
     } catch {
       setError('Failed to delete report');
+    }
+  };
+
+  const openNotes = async (report) => {
+    if (!report?._id) return;
+    setNotesFor(report);
+    try {
+      await markReportNotesRead(report._id);
+      // Optimistic: mark as read in UI
+      setReports((prev) =>
+        (prev || []).map((r) => {
+          if (String(r?._id) !== String(report._id)) return r;
+          const notes = Array.isArray(r.doctorNotes) ? r.doctorNotes : [];
+          return { ...r, doctorNotes: notes.map((n) => ({ ...n, isRead: true })) };
+        })
+      );
+    } catch {
+      // ignore — still show notes
     }
   };
 
@@ -374,6 +394,8 @@ export default function PatientReports() {
           {filteredReports.map(r => {
             const { icon, color, bg } = getIcon(r.fileType);
             const visibility = getVisibility(r);
+            const notes = Array.isArray(r.doctorNotes) ? r.doctorNotes : [];
+            const unreadCount = notes.filter((n) => !n?.isRead).length;
             return (
               <div key={r._id} style={s.reportCard} className="patient-report-card">
                 <div style={{ ...s.fileIcon, background: bg, color }}>{icon}</div>
@@ -387,6 +409,16 @@ export default function PatientReports() {
                   </div>
                 </div>
                 <div style={s.fileActions} className="patient-report-actions">
+                  {notes.length > 0 && (
+                    <button
+                      onClick={() => openNotes(r)}
+                      style={s.noteBtn}
+                      className="patient-report-action-btn"
+                      title="Doctor notes"
+                    >
+                      🔔 Notes{unreadCount > 0 ? ` (${unreadCount})` : ''}
+                    </button>
+                  )}
                   <button onClick={() => handleOpen(r)} style={s.viewBtn} className="patient-report-action-btn">
                     Open ↗
                   </button>
@@ -400,6 +432,47 @@ export default function PatientReports() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Notes modal */}
+      {notesFor?._id && (
+        <div style={s.modalOverlay} onClick={() => setNotesFor(null)}>
+          <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modalHeader}>
+              <div>
+                <div style={s.modalTitle}>Doctor notes</div>
+                <div style={s.modalSub}>
+                  {notesFor.title || notesFor.filename || 'Report'}
+                </div>
+              </div>
+              <button style={s.modalClose} onClick={() => setNotesFor(null)}>✕</button>
+            </div>
+            <div style={s.modalBody}>
+              {(Array.isArray(notesFor.doctorNotes) ? notesFor.doctorNotes : []).length === 0 ? (
+                <div style={s.empty}>No notes yet</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {(notesFor.doctorNotes || [])
+                    .slice()
+                    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                    .map((n, idx) => (
+                      <div key={idx} style={s.noteCard}>
+                        <div style={s.noteTop}>
+                          <div style={s.noteDoctor}>
+                            {n.doctorName ? `Dr. ${n.doctorName}` : 'Doctor'}
+                          </div>
+                          <div style={s.noteTime}>
+                            {n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}
+                          </div>
+                        </div>
+                        <div style={s.noteText}>{n.note}</div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </PatientLayout>
@@ -440,6 +513,7 @@ const s = {
   badgePrivate:   { display: 'inline-block', marginTop: 8, padding: '3px 8px', borderRadius: 999, background: '#edf3fa', color: '#4f6d88', fontSize: 11, fontWeight: 700, border: '1px solid #d8e3ef' },
   badgeShared:    { display: 'inline-block', marginTop: 8, padding: '3px 8px', borderRadius: 999, background: '#ecfbf3', color: '#176b41', fontSize: 11, fontWeight: 700, border: '1px solid #cdeedc' },
   fileActions:    { display: 'flex', gap: 8, flexShrink: 0 },
+  noteBtn:        { padding: '7px 14px', background: '#f1f5ff', color: '#2442a0', border: '1px solid #d7e0ff', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 },
   viewBtn:        { padding: '7px 14px', background: '#eaf3ff', color: '#1e5483', borderRadius: 8, border: '1px solid #c8dcf0', cursor: 'pointer', fontSize: 13, fontWeight: 700 },
   downloadBtn:    { padding: '7px 14px', background: '#ecfbf3', color: '#176b41', border: '1px solid #cdeedc', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 },
   deleteBtn:      { padding: '7px 14px', background: '#fff2f2', color: '#c63c3c', border: '1px solid #f0d1d1', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 },
@@ -448,6 +522,19 @@ const s = {
   emptyIcon:      { fontSize: 48, marginBottom: 16 },
   emptyTitle:     { fontSize: 16, fontWeight: 700, color: '#0e2f4b', marginBottom: 8 },
   emptySub:       { fontSize: 14, color: '#6b879e' },
+
+  modalOverlay:   { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 60 },
+  modal:          { width: 'min(720px, 100%)', background: '#fff', borderRadius: 16, border: '1px solid #d8e6f5', boxShadow: '0 24px 60px rgba(3, 40, 88, 0.25)', overflow: 'hidden' },
+  modalHeader:    { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '14px 16px', borderBottom: '1px solid #e6eef7', background: 'linear-gradient(180deg, #ffffff 0%, #f7fbff 100%)' },
+  modalTitle:     { fontSize: 13, fontWeight: 800, color: '#0e2f4b' },
+  modalSub:       { fontSize: 12, color: '#6b879e', marginTop: 2 },
+  modalClose:     { width: 34, height: 34, borderRadius: 10, background: '#eef4fb', border: '1px solid #d6e4f2', cursor: 'pointer', fontWeight: 800, color: '#395b77' },
+  modalBody:      { padding: 16 },
+  noteCard:       { border: '1px solid #d8e6f5', background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)', borderRadius: 12, padding: 12 },
+  noteTop:        { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
+  noteDoctor:     { fontSize: 12, fontWeight: 800, color: '#11345c' },
+  noteTime:       { fontSize: 11, color: '#6b879e' },
+  noteText:       { fontSize: 13, color: '#1d3557', lineHeight: 1.35, whiteSpace: 'pre-wrap' },
 };
 
 const reportCss = `

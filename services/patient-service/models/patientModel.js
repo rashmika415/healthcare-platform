@@ -70,7 +70,18 @@ const reportSchema = new mongoose.Schema({
   updatedBy:   { type: String },
   deletedBy:   { type: String },
   deletedAt:   { type: Date },
-  uploadedAt: { type: Date, default: Date.now }
+  uploadedAt: { type: Date, default: Date.now },
+
+  // Notes sent by doctors to the patient for this report
+  doctorNotes: [
+    {
+      doctorUserId: { type: String, required: true },
+      doctorName:   { type: String },
+      note:         { type: String, required: true, trim: true },
+      createdAt:    { type: Date, default: Date.now },
+      isRead:       { type: Boolean, default: false }
+    }
+  ]
 });
 
 
