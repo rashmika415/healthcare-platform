@@ -116,7 +116,7 @@ export default function DoctorProfile() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       <Sidebar />
 
       <div className="flex-1 p-6">

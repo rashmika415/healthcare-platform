@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle, Download, FileText, Search, XCircle, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/doctor/Sidebar";
+import Topbar from "../../components/doctor/Topbar";
 import {
   addDoctorNoteToReport,
   getDoctorSharedReports,
@@ -125,9 +126,10 @@ export default function Reports() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       <Sidebar />
       <div className="flex-1 p-6 overflow-auto">
+        <Topbar />
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Reports</h1>

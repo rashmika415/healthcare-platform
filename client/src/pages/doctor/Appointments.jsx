@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../services/api";
 import PrescriptionForm from "../../components/doctor/PrescriptionForm";
 import Sidebar from "../../components/doctor/Sidebar";
+import Topbar from "../../components/doctor/Topbar";
 
 const STATUS_STYLES = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -151,12 +152,13 @@ export default function DoctorAppointments() {
       : appointments.filter(a => a.status === filter);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       <Sidebar />
       <div className="flex-1 p-6 overflow-auto">
+      <Topbar />
 
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Appointments</h1>
         <p className="text-sm text-slate-400 mt-0.5">Manage your patient bookings</p>
       </div>
