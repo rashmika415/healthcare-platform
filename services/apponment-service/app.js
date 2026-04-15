@@ -26,6 +26,10 @@ app.get(
     "/appointments/patient/:patientId",
     appointmentController.getAppointmentsByPatientId
 );
+app.get(
+    "/appointments/doctor/:doctorId",
+    appointmentController.getAppointmentsByDoctorId
+);
 
 app.use("/appointments", appointmentRoutes);
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import API from "../../services/doctorApi";
+import api from "../../services/api";
 import Sidebar from "../../components/doctor/Sidebar";
 import StatCard from "../../components/doctor/StatCard";
 import AnalyticsChart from "../../components/doctor/AnalyticsChart";
@@ -140,20 +140,81 @@ export default function DoctorDashboard() {
   const [stats, setStats]               = useState({ total: 0, approved: 0, pending: 0 });
   const [appointments, setAppointments] = useState([]);
   const [selected, setSelected]         = useState(null);
+  const [doctorProfileId, setDoctorProfileId] = useState("");
 
   const user = getStoredUser();
 
   useEffect(() => { fetchDashboard(); }, []);
 
+  const authDoctorId =
+    String(user?.id ?? user?._id ?? user?.userId ?? user?.doctorId ?? "");
+
+  const resolveDoctorProfileId = async () => {
+    try {
+      const res = await api.get("/doctor/profile");
+      const id = String(res.data?._id || "").trim();
+      if (id) setDoctorProfileId(id);
+      return id || "";
+    } catch {
+      // Fallback: resolve by email when doctor profile isn't created yet
+      try {
+        const email = String(user?.email || "").trim().toLowerCase();
+        if (!email) return "";
+        const res = await api.get(`/doctor/internal/by-email/${encodeURIComponent(email)}`);
+        const id = String(res.data?.doctor?._id || "").trim();
+        if (id) setDoctorProfileId(id);
+        return id || "";
+      } catch {
+        return "";
+      }
+    }
+  };
+
+  const normalizeStatus = (raw) => {
+    const s = String(raw || "").toLowerCase();
+    if (!s) return "pending";
+    if (s === "booked") return "pending";
+    if (s === "approved") return "accepted";
+    return s;
+  };
+
+  const mapAppointment = (a) => ({
+    ...a,
+    status: normalizeStatus(a.status),
+    timeSlot: a.timeSlot || a.time || "--",
+  });
+
   const fetchDashboard = async () => {
     try {
-      const res  = await API.get("/appointments");
-      const data = res.data || [];
+      const profileId =
+        doctorProfileId || (await resolveDoctorProfileId());
+      const doctorId = profileId || authDoctorId;
+
+      if (!doctorId) {
+        setAppointments([]);
+        setStats({ total: 0, approved: 0, pending: 0 });
+        setSelected(null);
+        return;
+      }
+
+      // Primary: appointment-service doctor list (through gateway)
+      let list = [];
+      try {
+        const res = await api.get(`/appointments/doctor/${encodeURIComponent(doctorId)}`);
+        list = Array.isArray(res.data?.appointments) ? res.data.appointments : [];
+      } catch {
+        // Fallback: fetch-all and filter (works even if doctor endpoint isn't available)
+        const res = await api.get("/appointments/getallappointments");
+        const all = Array.isArray(res.data?.appointments) ? res.data.appointments : [];
+        list = all.filter(a => String(a.doctorId) === String(doctorId));
+      }
+
+      const data = list.map(mapAppointment);
       setAppointments(data);
       setStats({
         total:    data.length,
-        approved: data.filter(a => a.status === "approved" || a.status === "accepted").length,
-        pending:  data.filter(a => a.status === "pending").length,
+        approved: data.filter(a => a.status === "accepted" || a.status === "approved").length,
+        pending:  data.filter(a => a.status === "pending" || a.status === "booked").length,
       });
       if (data.length > 0) setSelected(data[0]);
     } catch (err) {
@@ -165,6 +226,12 @@ export default function DoctorDashboard() {
     a => new Date(a.date).toDateString() === new Date().toDateString()
   );
   const displayList = todayList.length > 0 ? todayList : appointments.slice(0, 6);
+
+  useEffect(() => {
+    const onChanged = () => fetchDashboard();
+    window.addEventListener("appointments:changed", onChanged);
+    return () => window.removeEventListener("appointments:changed", onChanged);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-slate-50">

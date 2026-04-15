@@ -89,6 +89,11 @@ function AddAppointment() {
 
       alert("✅ Appointment Added Successfully!");
 
+      // Let other tabs/pages (doctor dashboard) refresh their appointment lists.
+      try {
+        window.dispatchEvent(new Event("appointments:changed"));
+      } catch {}
+
       // 🔥 GO TO PAYMENT PAGE
       navigate("/payment", {
         state: {
