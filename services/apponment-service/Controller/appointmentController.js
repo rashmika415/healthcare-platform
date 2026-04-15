@@ -85,6 +85,29 @@ const getAppointmentsByPatientId = async (req, res) => {
     }
 };
 
+/** Appointments for one doctor (stored fields only — no cross-service calls) */
+const getAppointmentsByDoctorId = async (req, res) => {
+    try {
+        const { doctorId } = req.params;
+        if (!doctorId) {
+            return res.status(400).json({ message: "doctorId is required" });
+        }
+        const raw = decodeURIComponent(String(doctorId)).trim();
+        const or = [{ doctorId: raw }];
+        if (raw.length === 24 && /^[a-fA-F0-9]+$/.test(raw)) {
+            or.push({ doctorId: raw.toLowerCase() });
+        }
+        const appointments = await Appointment.find({ $or: or })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        return res.status(200).json({ appointments });
+    } catch (error) {
+        console.error("getAppointmentsByDoctorId:", error);
+        return res.status(500).json({ message: "Error fetching doctor appointments" });
+    }
+};
+
 //create appointment
 const createappointment = async (req, res) => {
     const {
@@ -140,7 +163,18 @@ const getappointmentbyid = async (req, res) => {
 //update appointment
 const updateappointment = async (req, res) => {
     const id = req.params.id;
-    const { patientId, doctorId, patientName, doctorName, specialization, date, time ,paymentStatus   } = req.body;
+    const {
+        patientId,
+        doctorId,
+        patientName,
+        doctorName,
+        specialization,
+        date,
+        time,
+        status,
+        paymentStatus,
+        notes,
+    } = req.body;
     let appointment;
     try {
         appointment = await Appointment.findByIdAndUpdate(id, { 
@@ -151,7 +185,9 @@ const updateappointment = async (req, res) => {
             specialization,
             date,
             time,
-            paymentStatus
+            status,
+            paymentStatus,
+            notes,
         }, { new: true });
     }   
     catch (error) {
@@ -187,3 +223,4 @@ exports.deleteappointment = deleteappointment;
 exports.getappointmentbyid = getappointmentbyid;
 exports.getVerifiedDoctorsForBooking = getVerifiedDoctorsForBooking;
 exports.getAppointmentsByPatientId = getAppointmentsByPatientId;
+exports.getAppointmentsByDoctorId = getAppointmentsByDoctorId;

@@ -138,6 +138,9 @@ app.use('/appointments',
   createProxyMiddleware({
     target: process.env.APPOINTMENT_SERVICE_URL || 'http://localhost:3003',
     changeOrigin: true,
+    // Express strips the mount path (/appointments) from req.url.
+    // The appointment-service mounts routes at /appointments, so we must re-add it.
+    pathRewrite: (path) => `/appointments${path}`,
     proxyTimeout: 15000,
     timeout: 15000,
     on: {
