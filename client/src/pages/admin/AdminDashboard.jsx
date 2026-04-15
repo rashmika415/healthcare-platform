@@ -69,6 +69,7 @@ export default function AdminDashboard() {
             { label: 'Dashboard', path: '/admin/dashboard' },
             { label: 'Doctors', path: '/admin/doctors' },
             { label: 'Patients', path: '/admin/patients' },
+            { label: 'Video Sessions', path: '/admin/video' },
             { label: 'Transactions', path: '/admin/transactions' },
           ].map(item => (
             <Link key={item.path} to={item.path} style={s.navItem}>
@@ -146,6 +147,13 @@ export default function AdminDashboard() {
                 <div style={s.quickIcon}>💳</div>
                 <div style={s.quickTitle}>Transactions</div>
                 <div style={s.quickCount}>View all payments</div>
+                <div style={s.quickArrow}>→</div>
+              </Link>
+
+              <Link to="/admin/video" style={s.quickCard}>
+                <div style={s.quickIcon}>🎥</div>
+                <div style={s.quickTitle}>Video Management</div>
+                <div style={s.quickCount}>Monitor consultations</div>
                 <div style={s.quickArrow}>→</div>
               </Link>
             </div>

@@ -271,3 +271,62 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error while handling appointment session' });
   }
 };
+
+/**
+ * Admin: Get all active sessions
+ */
+exports.adminGetAllSessions = async (req, res) => {
+  try {
+    const { role } = req.user;
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin only.' });
+    }
+
+    const sessions = await VideoSession.find().sort({ createdAt: -1 });
+    
+    // Auto-cleanup expired sessions on the fly if needed
+    const now = Date.now();
+    const activeSessions = [];
+    
+    for (const session of sessions) {
+      if (now > new Date(session.expiresAt).getTime()) {
+        await VideoSession.deleteOne({ _id: session._id });
+      } else {
+        activeSessions.push(session);
+      }
+    }
+
+    return res.status(200).json({
+      totalActive: activeSessions.length,
+      sessions: activeSessions
+    });
+  } catch (error) {
+    console.error('Error in adminGetAllSessions:', error);
+    return res.status(500).json({ error: 'Internal server error while fetching all sessions' });
+  }
+};
+
+/**
+ * Admin: Force delete a session
+ */
+exports.adminDeleteSession = async (req, res) => {
+  try {
+    const { role } = req.user;
+    const { sessionId } = req.params;
+
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin only.' });
+    }
+
+    const result = await VideoSession.deleteOne({ sessionId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    return res.status(200).json({ message: 'Session terminated successfully' });
+  } catch (error) {
+    console.error('Error in adminDeleteSession:', error);
+    return res.status(500).json({ error: 'Internal server error while taking admin action' });
+  }
+};
