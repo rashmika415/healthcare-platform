@@ -12,6 +12,19 @@ const authMiddleware = require('./middleware/authMiddleware');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+function forwardUserHeaders(proxyReq, req) {
+  if (req.headers['x-user-id']) {
+    proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+    proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
+    proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
+    proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
+    const verified = req.headers['x-user-verified'];
+    if (verified !== undefined && verified !== null) {
+      proxyReq.setHeader('x-user-verified', verified);
+    }
+  }
+}
+
 // ── Global middleware ─────────────────────────────────
 app.use(helmet());
 app.use(cors());
@@ -127,6 +140,7 @@ app.use('/patients',
     pathRewrite: (path) => `/patients${path}`,
     on: {
       proxyReq: (proxyReq, req, res) => {
+        forwardUserHeaders(proxyReq, req);
         fixRequestBody(proxyReq, req, res);
       }
     }
@@ -138,8 +152,6 @@ app.use('/appointments',
   createProxyMiddleware({
     target: process.env.APPOINTMENT_SERVICE_URL || 'http://localhost:3003',
     changeOrigin: true,
-    // Express strips the mount path (/appointments) from req.url.
-    // The appointment-service mounts routes at /appointments, so we must re-add it.
     pathRewrite: (path) => `/appointments${path}`,
     proxyTimeout: 15000,
     timeout: 15000,
@@ -167,17 +179,7 @@ app.use('/doctor',
     timeout: 15000,
     on: {
       proxyReq: (proxyReq, req, res) => {
-        // Forward user info headers set by authMiddleware
-        if (req.headers['x-user-id']) {
-          proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
-          proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
-          proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
-          proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
-          const verified = req.headers['x-user-verified'];
-          if (verified !== undefined && verified !== null) {
-            proxyReq.setHeader('x-user-verified', verified);
-          }
-        }
+        forwardUserHeaders(proxyReq, req);
         fixRequestBody(proxyReq, req, res);
       },
       error: (err, req, res) => {
@@ -203,12 +205,7 @@ app.use('/video',
     timeout: 15000,
     on: {
       proxyReq: (proxyReq, req, res) => {
-        if (req.headers['x-user-id']) {
-          proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
-          proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
-          proxyReq.setHeader('x-user-email', req.headers['x-user-email']);
-          proxyReq.setHeader('x-user-name', req.headers['x-user-name']);
-        }
+        forwardUserHeaders(proxyReq, req);
         fixRequestBody(proxyReq, req, res);
       },
       error: (err, req, res) => {

@@ -12,6 +12,9 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
+const PAYMENT_API_BASE_URL =
+  process.env.REACT_APP_PAYMENT_URL || "http://localhost:3104";
+
 // ✅ FIXED KEY (same as backend account)
 const stripeKey =
   process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY ||
@@ -37,7 +40,7 @@ function CheckoutForm() {
     const fetchPaymentIntent = async () => {
       try {
         const res = await axios.post(
-          "http://localhost:3004/payments/create",
+          `${PAYMENT_API_BASE_URL}/payments/create`,
           { appointmentId }
         );
 
@@ -96,7 +99,7 @@ function CheckoutForm() {
       }
 
       if (result.paymentIntent.status === "succeeded") {
-        await axios.post("http://localhost:3004/payments/confirm", {
+        await axios.post(`${PAYMENT_API_BASE_URL}/payments/confirm`, {
           paymentId,
         });
 

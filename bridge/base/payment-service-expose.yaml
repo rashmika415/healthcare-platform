@@ -1,0 +1,18 @@
+#! payment-service-expose.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: payment-service
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: payment-service
+spec:
+    selector:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: payment-service
+    ports:
+        - name: payment-se-3004
+          port: 3004
+          targetPort: payment-se-3004

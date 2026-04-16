@@ -1,0 +1,53 @@
+#! payment-service-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: payment-service
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: payment-service
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: healthcare-platform
+            com.docker.compose.service: payment-service
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: healthcare-platform
+                com.docker.compose.service: payment-service
+                com.docker.compose.network.default: "true"
+        spec:
+            containers:
+                - name: payment-service
+                  image: healthcare-platform-payment-service
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: APPOINTMENT_SERVICE_URL
+                      value: "http://appointment-service:3003"
+                    - name: DOCTOR_SERVICE_URL
+                      value: "http://doctor-service:3002"
+                    - name: MONGO_URI
+                      value: "mongodb://mongo:27017/paymentdb"
+                    - name: PORT
+                      value: "3004"
+                    - name: STRIPE_SECRET_KEY
+                      value: "change-me-stripe-secret"
+                  livenessProbe:
+                    exec:
+                        command:
+                            - /bin/sh
+                            - -c
+                            - node -e "const net=require('net');const s=net.connect(3004,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),3000);"
+                    periodSeconds: 15
+                    initialDelaySeconds: 25
+                    timeoutSeconds: 5
+                    failureThreshold: 10
+                  ports:
+                    - name: payment-se-3004
+                      containerPort: 3004

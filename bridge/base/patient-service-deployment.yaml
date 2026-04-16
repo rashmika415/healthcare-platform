@@ -1,0 +1,59 @@
+#! patient-service-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: patient-service
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: patient-service
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: healthcare-platform
+            com.docker.compose.service: patient-service
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: healthcare-platform
+                com.docker.compose.service: patient-service
+                com.docker.compose.network.default: "true"
+        spec:
+            containers:
+                - name: patient-service
+                  image: healthcare-platform-patient-service
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: APPOINTMENT_SERVICE_URL
+                      value: "http://appointment-service:3003"
+                    - name: CLOUDINARY_API_KEY
+                      value: "change-me-cloudinary-key"
+                    - name: CLOUDINARY_API_SECRET
+                      value: "change-me-cloudinary-secret"
+                    - name: CLOUDINARY_CLOUD_NAME
+                      value: "change-me-cloudinary-cloud"
+                    - name: DOCTOR_SERVICE_URL
+                      value: "http://doctor-service:3002"
+                    - name: JWT_SECRET
+                      value: "change-me-jwt-secret"
+                    - name: MONGO_URI
+                      value: "mongodb://mongo:27017/patientdb"
+                    - name: PORT
+                      value: "3001"
+                  livenessProbe:
+                    exec:
+                        command:
+                            - /bin/sh
+                            - -c
+                            - node -e "require('http').get('http://127.0.0.1:3001/health', (r) => process.exit(r.statusCode === 200 ? 0: 1)).on('error', () => process.exit(1))"
+                    periodSeconds: 15
+                    initialDelaySeconds: 25
+                    timeoutSeconds: 5
+                    failureThreshold: 10
+                  ports:
+                    - name: patient-se-3001
+                      containerPort: 3001

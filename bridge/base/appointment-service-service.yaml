@@ -1,0 +1,21 @@
+#! appointment-service-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: appointment-service-published
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: appointment-service
+spec:
+    selector:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: appointment-service
+    ports:
+        - name: appointmen-3003
+          port: 3003
+          protocol: TCP
+          targetPort: appointmen-3003
+
+# check if there is at least one published port

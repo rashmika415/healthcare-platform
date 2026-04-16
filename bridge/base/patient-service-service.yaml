@@ -1,0 +1,21 @@
+#! patient-service-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: patient-service-published
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: patient-service
+spec:
+    selector:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: patient-service
+    ports:
+        - name: patient-se-3001
+          port: 3001
+          protocol: TCP
+          targetPort: patient-se-3001
+
+# check if there is at least one published port

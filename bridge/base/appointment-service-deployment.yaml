@@ -1,0 +1,49 @@
+#! appointment-service-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: appointment-service
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: appointment-service
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: healthcare-platform
+            com.docker.compose.service: appointment-service
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: healthcare-platform
+                com.docker.compose.service: appointment-service
+                com.docker.compose.network.default: "true"
+        spec:
+            containers:
+                - name: appointment-service
+                  image: healthcare-platform-appointment-service
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: DOCTOR_SERVICE_URL
+                      value: "http://doctor-service:3002"
+                    - name: MONGO_URI
+                      value: "mongodb://mongo:27017/appointmentdb"
+                    - name: PORT
+                      value: "3003"
+                  livenessProbe:
+                    exec:
+                        command:
+                            - /bin/sh
+                            - -c
+                            - node -e "require('http').get('http://127.0.0.1:3003/', (r) => process.exit(r.statusCode < 500 ? 0: 1)).on('error', () => process.exit(1))"
+                    periodSeconds: 15
+                    initialDelaySeconds: 25
+                    timeoutSeconds: 5
+                    failureThreshold: 10
+                  ports:
+                    - name: appointmen-3003
+                      containerPort: 3003

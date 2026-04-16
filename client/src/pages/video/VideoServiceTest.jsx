@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import './VideoServiceTest.css';
 
+const VIDEO_SERVICE_BASE_URL =
+  process.env.REACT_APP_VIDEO_SERVICE_URL || 'http://localhost:3106';
+
 const VideoServiceTest = () => {
   const [role, setRole] = useState('doctor'); // 'doctor' or 'patient'
   const [loading, setLoading] = useState(false);
@@ -34,7 +37,7 @@ const VideoServiceTest = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:3006/video/sessions', {
+      const response = await fetch(`${VIDEO_SERVICE_BASE_URL}/video/sessions`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -77,7 +80,7 @@ const VideoServiceTest = () => {
     };
 
     try {
-      const response = await fetch(`http://localhost:3006/video/sessions/${sessionId}/join`, {
+      const response = await fetch(`${VIDEO_SERVICE_BASE_URL}/video/sessions/${sessionId}/join`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

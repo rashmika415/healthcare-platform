@@ -1,0 +1,16 @@
+#! kustomization.yaml
+# Generated code, do not edit
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+    - ../../base
+patches:
+    - path: api-gateway-service.yaml
+    - path: appointment-service-service.yaml
+    - path: client-service.yaml
+    - path: doctor-service-service.yaml
+    - path: mongo-mongo-data-persistentVolumeClaim.yaml
+    - path: mongo-service.yaml
+    - path: patient-service-service.yaml
+    - path: payment-service-service.yaml
+    - path: video-service-service.yaml
