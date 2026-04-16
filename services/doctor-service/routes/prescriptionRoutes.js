@@ -1,17 +1,18 @@
-const express    = require('express');
-const router     = express.Router();
-const auth       = require('../middleware/authMiddleware');
-const ctrl       = require('../controllers/prescriptionController');
+const express = require('express');
+const router = express.Router();
+const auth = require('../middleware/authMiddleware');
+const ctrl = require('../controllers/prescriptionController');
 
 // All routes protected
 router.use(auth);
 
-router.post('/',          ctrl.createPrescription);
-router.get('/',           ctrl.getDoctorPrescriptions);
+router.post('/', ctrl.createPrescription);
+router.post('/ai-suggest', ctrl.generateAiSuggestion);
+router.get('/', ctrl.getDoctorPrescriptions);
 router.get('/patient/:patientUserId', ctrl.getPatientPrescriptions);
-router.get('/:id',        ctrl.getPrescriptionById);
-router.put('/:id',        ctrl.updatePrescription);
+router.get('/:id', ctrl.getPrescriptionById);
+router.put('/:id', ctrl.updatePrescription);
 router.patch('/:id/status', ctrl.updatePrescriptionStatus);
-router.delete('/:id',     ctrl.deletePrescription);
+router.delete('/:id', ctrl.deletePrescription);
 
 module.exports = router;

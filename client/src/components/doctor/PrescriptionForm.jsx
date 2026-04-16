@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../../services/api";
-import { Plus, Trash2, Pill, User, FileText, CheckCircle, XCircle, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Pill, User, FileText, CheckCircle, XCircle, ChevronDown, Sparkles } from "lucide-react";
 
 const FREQUENCIES = ["Once daily", "Twice daily", "Three times daily", "Four times daily", "As needed"];
 
 export default function PrescriptionForm({ patientEmail: initialPatientEmail, patientName: initialPatientName, onSuccess }) {
   const [patientEmail, setPatientEmail] = useState(initialPatientEmail || "");
-  const [patientName,   setPatientName]   = useState(initialPatientName || "");
-  const [diagnosis,     setDiagnosis]     = useState("");
-  const [instructions,  setInstructions]  = useState("");
-  const [loading,       setLoading]       = useState(false);
-  const [message,       setMessage]       = useState(null);
+  const [patientName, setPatientName] = useState(initialPatientName || "");
+  const [diagnosis, setDiagnosis] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [message, setMessage] = useState(null);
   const [patientEmails, setPatientEmails] = useState([]);
   const [loadingEmails, setLoadingEmails] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -36,8 +37,8 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const fetchPatientEmails = async () => {
@@ -75,6 +76,78 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
     setTimeout(() => setMessage(null), 3500);
   };
 
+  const handleGenerateAISuggestion = async () => {
+    if (!diagnosis.trim()) {
+      return showMessage("error", "Diagnosis is required for AI suggestion.");
+    }
+
+    try {
+      setAiLoading(true);
+
+      const res = await api.post("/doctor/prescriptions/ai-suggest", {
+        patientEmail,
+        patientName,
+        diagnosis,
+      });
+
+      const data = res?.data || {};
+      console.log("AI response:", data);
+
+      let suggestedMedicines = [];
+
+      if (Array.isArray(data.medicines) && data.medicines.length > 0) {
+        suggestedMedicines = data.medicines;
+      } else if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+        suggestedMedicines = data.suggestions;
+      } else if (data.medicine) {
+        suggestedMedicines = [
+          {
+            name: data.medicine || "",
+            dosage: data.dosage || "",
+            duration: data.duration || "",
+            frequency: data.frequency || "Once daily",
+          },
+        ];
+      }
+
+      const cleanedMedicines = suggestedMedicines
+        .map((m) => ({
+          name: m?.name ? String(m.name).trim() : "",
+          dosage: m?.dosage ? String(m.dosage).trim() : "",
+          duration: m?.duration ? String(m.duration).trim() : "",
+          frequency: FREQUENCIES.includes(String(m?.frequency || "").trim())
+            ? String(m.frequency).trim()
+            : "Once daily",
+        }))
+        .filter((m) => m.name || m.dosage || m.duration);
+
+      if (cleanedMedicines.length === 0) {
+        return showMessage("error", "AI returned no medicine suggestions.");
+      }
+
+      setMedicines(cleanedMedicines);
+
+      if (typeof data.instructions === "string" && data.instructions.trim()) {
+        setInstructions(data.instructions.trim());
+      } else if (typeof data.note === "string" && data.note.trim()) {
+        setInstructions(data.note.trim());
+      } else if (typeof data.notes === "string" && data.notes.trim()) {
+        setInstructions(data.notes.trim());
+      }
+
+      showMessage("success", "AI suggestion generated successfully!");
+    } catch (err) {
+      console.error("AI suggestion failed:", err);
+      const backendError = err.response?.data?.error || err.response?.data?.message;
+      if (!err.response) {
+        return showMessage("error", err.message || "Network error. Please start the backend.");
+      }
+      showMessage("error", backendError || "Failed to generate AI suggestion.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!patientEmail) return showMessage("error", "Patient email is required.");
     for (const m of medicines) {
@@ -90,10 +163,8 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
         instructions,
         diagnosis,
       });
-      // Backend returns `{ prescription }`; keep UI resilient to future response shapes.
       const createdPrescription = res?.data?.prescription ?? res?.data;
       showMessage("success", "Prescription sent successfully!");
-      // Reset
       if (!initialPatientEmail) setPatientEmail("");
       setPatientName("");
       setDiagnosis("");
@@ -107,12 +178,10 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
       const backendError = data?.error || data?.message;
       const backendDetails = data?.details;
 
-      // Hide legacy backend validation wording (patientUserId + medicines) from doctor UI.
       if (typeof backendError === "string" && /patientuser(id)?\s+and\s+medicines\s+are\s+required/i.test(backendError)) {
         return showMessage("error", "Failed to send prescription.");
       }
 
-      // If server didn't respond (gateway/service down, CORS, network)
       if (!err.response) {
         return showMessage("error", err.message || "Network error. Please start the backend.");
       }
@@ -129,22 +198,22 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
   return (
     <div className="space-y-5">
 
-      {/* Message */}
       {message && (
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium ${
-          message.type === "success"
-            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-            : "bg-rose-50 text-rose-600 border border-rose-200"
-        }`}>
-          {message.type === "success" ? <CheckCircle size={15}/> : <XCircle size={15}/>}
+        <div
+          className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium ${
+            message.type === "success"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-rose-50 text-rose-600 border border-rose-200"
+          }`}
+        >
+          {message.type === "success" ? <CheckCircle size={15} /> : <XCircle size={15} />}
           {message.text}
         </div>
       )}
 
-      {/* Patient Info */}
       <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-          <User size={12}/> Patient Information
+          <User size={12} /> Patient Information
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -153,7 +222,7 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
               <input
                 type="email"
                 value={patientEmail}
-                onChange={e => {
+                onChange={(e) => {
                   setPatientEmail(e.target.value);
                   setShowDropdown(true);
                 }}
@@ -168,11 +237,10 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 transition"
                 >
-                  <ChevronDown size={16} className={`transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={16} className={`transition-transform ${showDropdown ? "rotate-180" : ""}`} />
                 </button>
               )}
-              
-              {/* Dropdown */}
+
               {showDropdown && !initialPatientEmail && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto">
                   {loadingEmails ? (
@@ -185,9 +253,10 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
                     </div>
                   ) : (
                     patientEmails
-                      .filter(patient => 
-                        patient.email.toLowerCase().includes(patientEmail.toLowerCase()) ||
-                        patient.name.toLowerCase().includes(patientEmail.toLowerCase())
+                      .filter(
+                        (patient) =>
+                          patient.email.toLowerCase().includes(patientEmail.toLowerCase()) ||
+                          patient.name.toLowerCase().includes(patientEmail.toLowerCase())
                       )
                       .map((patient, index) => (
                         <button
@@ -210,7 +279,7 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
             <input
               type="text"
               value={patientName}
-              onChange={e => setPatientName(e.target.value)}
+              onChange={(e) => setPatientName(e.target.value)}
               disabled={!!initialPatientName}
               placeholder="Patient full name"
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition"
@@ -222,24 +291,39 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
           <input
             type="text"
             value={diagnosis}
-            onChange={e => setDiagnosis(e.target.value)}
+            onChange={(e) => setDiagnosis(e.target.value)}
             placeholder="e.g. Hypertension, Type 2 Diabetes"
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
           />
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={handleGenerateAISuggestion}
+              disabled={aiLoading || !diagnosis.trim()}
+              className="inline-flex items-center gap-2 bg-violet-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+            >
+              {aiLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Sparkles size={16} />
+              )}
+              {aiLoading ? "Generating..." : "Generate AI Suggestion"}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Medicines */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Pill size={12}/> Medicines
+            <Pill size={12} /> Medicines
           </h3>
           <button
             onClick={addMedicine}
             className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
           >
-            <Plus size={13}/> Add Medicine
+            <Plus size={13} /> Add Medicine
           </button>
         </div>
 
@@ -266,7 +350,7 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
                   <input
                     type="text"
                     value={med.name}
-                    onChange={e => handleMedChange(i, "name", e.target.value)}
+                    onChange={(e) => handleMedChange(i, "name", e.target.value)}
                     placeholder="e.g. Amoxicillin 500mg"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   />
@@ -276,7 +360,7 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
                   <input
                     type="text"
                     value={med.dosage}
-                    onChange={e => handleMedChange(i, "dosage", e.target.value)}
+                    onChange={(e) => handleMedChange(i, "dosage", e.target.value)}
                     placeholder="e.g. 1 tablet"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   />
@@ -286,7 +370,7 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
                   <input
                     type="text"
                     value={med.duration}
-                    onChange={e => handleMedChange(i, "duration", e.target.value)}
+                    onChange={(e) => handleMedChange(i, "duration", e.target.value)}
                     placeholder="e.g. 7 days"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   />
@@ -296,10 +380,14 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
                   <div className="relative">
                     <select
                       value={med.frequency}
-                      onChange={e => handleMedChange(i, "frequency", e.target.value)}
+                      onChange={(e) => handleMedChange(i, "frequency", e.target.value)}
                       className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white transition"
                     >
-                      {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
+                      {FREQUENCIES.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
                     </select>
                     <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   </div>
@@ -310,21 +398,19 @@ export default function PrescriptionForm({ patientEmail: initialPatientEmail, pa
         </div>
       </div>
 
-      {/* Instructions */}
       <div>
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-          <FileText size={12}/> Instructions
+          <FileText size={12} /> Instructions
         </h3>
         <textarea
           rows={3}
           value={instructions}
-          onChange={e => setInstructions(e.target.value)}
+          onChange={(e) => setInstructions(e.target.value)}
           placeholder="Additional instructions for patient (e.g. take after meals, avoid alcohol...)"
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition"
         />
       </div>
 
-      {/* Submit */}
       <button
         onClick={handleSubmit}
         disabled={loading}
