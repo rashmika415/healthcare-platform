@@ -23,7 +23,7 @@ function appointmentApiBases() {
   );
   return [
     ...new Set(
-      [fromEnv, gatewayBase, "http://localhost:3100"].filter(Boolean)
+      [fromEnv, gatewayBase, "http://localhost:3000"].filter(Boolean)
     ),
   ];
 }

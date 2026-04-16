@@ -193,6 +193,28 @@ app.use('/doctor',
 );
 
 
+app.use('/payments',
+  createProxyMiddleware({
+    target: process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004',
+    changeOrigin: true,
+    // Preserve /payments prefix
+    pathRewrite: (path) => `/payments${path}`,
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error (payments):', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'Payment service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
 app.use('/video',
   authMiddleware,
   createProxyMiddleware({
