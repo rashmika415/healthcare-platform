@@ -1,0 +1,42 @@
+#! client-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: client
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: client
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: healthcare-platform
+            com.docker.compose.service: client
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: healthcare-platform
+                com.docker.compose.service: client
+                com.docker.compose.network.default: "true"
+        spec:
+            containers:
+                - name: healthcare-client
+                  image: healthcare-platform-client
+                  imagePullPolicy: IfNotPresent
+                  livenessProbe:
+                    exec:
+                        command:
+                            - /bin/sh
+                            - -c
+                            - wget -q -O /dev/null http://127.0.0.1/healthz || exit 1
+                    periodSeconds: 20
+                    initialDelaySeconds: 20
+                    timeoutSeconds: 5
+                    failureThreshold: 5
+                  ports:
+                    - name: client-80
+                      containerPort: 80

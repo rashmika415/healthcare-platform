@@ -1,0 +1,19 @@
+#! video-service-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: video-service-published
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: video-service
+spec:
+    selector:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: video-service
+    ports:
+        - name: video-serv-3006
+          port: 3006
+          protocol: TCP
+          targetPort: video-serv-3006

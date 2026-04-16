@@ -3,6 +3,8 @@ import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:3100";
+
 function AddAppointment() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -76,7 +78,7 @@ function AddAppointment() {
 
     try {
       const res = await axios.post(
-        "http://localhost:3003/appointments/createappointment",
+        `${API_BASE_URL}/appointments/createappointment`,
         formData
       );
 

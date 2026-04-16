@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const Prescription = require('../models/prescriptionModel');
 const Doctor = require('../models/doctorModels');
-const Patient = require('../../patient-service/models/patientModel');
 
 const getDoctorUserIdsForQuery = async (req) => {
   // Some older records may have been saved using a different "doctor id" value

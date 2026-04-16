@@ -1,0 +1,11 @@
+#! patient-service-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: patient-service-published
+    namespace: healthcare-platform
+spec:
+    type: LoadBalancer
+
+# check if there is at least one published port

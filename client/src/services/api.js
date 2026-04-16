@@ -1,8 +1,10 @@
 // client/src/services/api.js
 import axios from 'axios';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3100';
+
 const api = axios.create({
-  baseURL: 'http://localhost:3000'
+  baseURL: API_BASE_URL
 });
 
 // Auto attach token to every request
