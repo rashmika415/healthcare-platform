@@ -64,31 +64,36 @@ const createPayment = async (req, res) => {
 
 // 🔹 Confirm Payment (after success)
 const confirmPayment = async (req, res) => {
-  try {
-    const { paymentId } = req.body;
+try {
 
-    const payment = await Payment.findById(paymentId);
-    if (!payment) {
-      return res.status(404).json({ message: "Payment not found" });
-    }
+const { paymentId } = req.body;
 
-    payment.status = "PAID";
-    await payment.save();
+const payment = await Payment.findById(paymentId);
 
-    // Update appointment payment status to completed
-    await axios.put(
-      `${process.env.APPOINTMENT_SERVICE_URL}/appointments/updateappointment/${payment.appointmentId}`,
-      {
-        paymentStatus: "COMPLETED"
-      }
-    );
+payment.status = "PAID";
+await payment.save();
 
-    res.status(200).json({ message: "Payment successful" });
+await axios.put(
+`${process.env.APPOINTMENT_SERVICE_URL}/appointments/updateappointment/${payment.appointmentId}`,
+{
+paymentStatus: "COMPLETED"
+}
+);
 
-  } catch (error) {
-    console.error("Confirm Error:", error.message);
-    res.status(500).json({ error: error.message });
-  }
+await axios.post("http://localhost:3005/notifications/create", {
+patientId: payment.patientId,
+appointmentId: payment.appointmentId,
+type: "PAYMENT",
+message: `Payment completed successfully. Amount Rs.${payment.amount}`
+});
+
+res.status(200).json({
+message: "Payment successful"
+});
+
+} catch (error) {
+res.status(500).json({ error: error.message });
+}
 };
 
 // 🔹 Get all payments
