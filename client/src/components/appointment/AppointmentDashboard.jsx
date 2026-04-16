@@ -226,6 +226,40 @@ function AppointmentDashboard() {
     }
   };
 
+  const handleCancelAppointment = async (appointmentId) => {
+    const confirmCancel = window.confirm("Are you sure you want to cancel this appointment?");
+    if (!confirmCancel) return;
+
+    const bases = appointmentApiBases();
+
+    for (const base of bases) {
+      try {
+        await axios.put(
+          `${base}/appointments/updateappointment/${appointmentId}`,
+          {
+            status: "CANCELLED"
+          },
+          { timeout: 10000 }
+        );
+
+        setAppointments((prev) =>
+          prev.map((appt) =>
+            appt._id === appointmentId
+              ? { ...appt, status: "CANCELLED" }
+              : appt
+          )
+        );
+
+        alert("Appointment cancelled successfully");
+        return;
+      } catch (error) {
+        console.warn(`Failed to cancel using ${base}:`, error.message);
+      }
+    }
+
+    alert("Failed to cancel appointment");
+  };
+
   return (
     <PatientLayout title="Appointments" subtitle="View all your medical appointments">
       <div className="flex flex-col gap-6">
@@ -357,24 +391,35 @@ function AppointmentDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
                           <div className="space-y-2">
                             <p>
-                              <span className="font-medium text-slate-900">Specialization:</span>{' '}
+                              <span className="font-medium text-slate-900">Specialization:</span>{" "}
                               {appointment.specialization}
                             </p>
                             <p>
-                              <span className="font-medium text-slate-900">Patient:</span>{' '}
+                              <span className="font-medium text-slate-900">Patient:</span>{" "}
                               {appointment.patientName}
                             </p>
                           </div>
                           <div className="space-y-2">
                             <p>
-                              <span className="font-medium text-slate-900">Date & Time:</span>{' '}
+                              <span className="font-medium text-slate-900">Date & Time:</span>{" "}
                               {fmtDateTime(appointment.date)} {appointment.time}
                             </p>
                             <p>
-                              <span className="font-medium text-slate-900">Notes:</span>{' '}
+                              <span className="font-medium text-slate-900">Notes:</span>{" "}
                               {appointment.notes || "None"}
                             </p>
                           </div>
+                        </div>
+
+                        <div className="mt-4">
+                          {appointment.status !== "CANCELLED" && (
+                            <button
+                              onClick={() => handleCancelAppointment(appointment._id)}
+                              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition"
+                            >
+                              Cancel
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
