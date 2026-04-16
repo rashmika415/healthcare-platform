@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../services/api";
 import PrescriptionForm from "../../components/doctor/PrescriptionForm";
 import Sidebar from "../../components/doctor/Sidebar";
+import Topbar from "../../components/doctor/Topbar";
 import { toast, Toaster } from "react-hot-toast";
 
 const STATUS_STYLES = {
