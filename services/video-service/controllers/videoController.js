@@ -13,6 +13,38 @@ function canCreateSession(role) {
   return role === 'patient' || role === 'doctor';
 }
 
+/**
+ * Maps Auth User ID to Doctor Profile ID if necessary
+ */
+async function resolveRequesterIds(req) {
+  const { id: requesterId, role } = req.user;
+  let activeDoctorProfileId = null;
+
+  if (role === 'doctor') {
+    try {
+      const DOCTOR_SERVICE_URL = process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002';
+      // Forward gateway headers to authenticate with doctor-service
+      const resp = await axios.get(`${DOCTOR_SERVICE_URL}/profile`, {
+        headers: {
+          'x-user-id': req.headers['x-user-id'] || requesterId,
+          'x-user-role': req.headers['x-user-role'] || 'doctor',
+          'x-user-email': req.headers['x-user-email'],
+          'x-user-name': req.headers['x-user-name'],
+          'Authorization': req.headers['authorization']
+        }
+      });
+      activeDoctorProfileId = resp.data?._id;
+    } catch (err) {
+      console.error('resolveRequesterIds: Failed to fetch doctor profile:', err.message);
+    }
+  }
+
+  return {
+    userId: requesterId,
+    doctorProfileId: activeDoctorProfileId
+  };
+}
+
 exports.createSession = async (req, res) => {
   try {
     const { role, id: requesterId } = req.user;
@@ -76,7 +108,7 @@ exports.createSession = async (req, res) => {
 
 exports.joinSession = async (req, res) => {
   try {
-    const { id: requesterId, role } = req.user;
+    const { role } = req.user;
     const { sessionId } = req.params;
     const { participantToken } = req.body || {};
 
@@ -94,8 +126,12 @@ exports.joinSession = async (req, res) => {
       return res.status(410).json({ error: 'Session expired' });
     }
 
+    const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
     const isParticipant =
-      requesterId === session.patientUserId || requesterId === session.doctorUserId;
+      requesterId === session.patientUserId || 
+      requesterId === session.doctorUserId ||
+      (doctorProfileId && doctorProfileId === session.doctorUserId);
+
     if (!isParticipant) {
       return res.status(403).json({ error: 'You are not part of this consultation session' });
     }
@@ -164,7 +200,7 @@ exports.getSession = async (req, res) => {
 exports.getOrCreateSessionByAppointment = async (req, res) => {
   try {
     const { appointmentId } = req.params;
-    const { id: requesterId, role } = req.user;
+    const { role } = req.user;
 
     if (!appointmentId) {
       return res.status(400).json({ error: 'appointmentId is required' });
@@ -183,7 +219,12 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
 
     if (session) {
       // Verify authorization: Is the requester part of this session?
-      const isParticipant = requesterId === session.patientUserId || requesterId === session.doctorUserId;
+      const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
+      const isParticipant = 
+        requesterId === session.patientUserId || 
+        requesterId === session.doctorUserId ||
+        (doctorProfileId && doctorProfileId === session.doctorUserId);
+
       if (!isParticipant) {
         return res.status(403).json({ error: 'You are not authorized for this consultation' });
       }
@@ -219,15 +260,17 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    // 3. Verify status (Approved in this system is "BOOKED")
-    if (appointment.status !== 'BOOKED') {
+    // 3. Verify status (Approved in this system is "BOOKED" or "accepted")
+    const validStatuses = ['BOOKED', 'accepted', 'confirmed'];
+    if (!validStatuses.includes(appointment.status)) {
       return res.status(400).json({ 
-        error: `Session cannot be created. Appointment status is '${appointment.status}'. Must be 'BOOKED'.` 
+        error: `Session cannot be created. Appointment status is '${appointment.status}'. Must be one of: ${validStatuses.join(', ')}.` 
       });
     }
 
     // 4. Verify authorization: Is the requester the doctor or patient of this appointment?
-    const isDoctor = requesterId === appointment.doctorId;
+    const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
+    const isDoctor = requesterId === appointment.doctorId || (doctorProfileId && doctorProfileId === appointment.doctorId);
     const isPatient = requesterId === appointment.patientId;
     
     if (!isDoctor && !isPatient) {

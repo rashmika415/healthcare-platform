@@ -2,10 +2,13 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
 import PatientLayout from './Patientlayout ';
+import { getOrCreateSessionByAppointment, joinSession } from "../../services/videoApi";
+import { toast, Toaster } from "react-hot-toast";
 
 const STATUS_STYLES = {
   pending:   { bg: '#fff7ed', color: '#c05621', label: 'Pending' },
   confirmed: { bg: '#f0fdf4', color: '#16a34a', label: 'Confirmed' },
+  accepted:  { bg: '#f0fdf4', color: '#16a34a', label: 'Accepted' },
   completed: { bg: '#f0f7ff', color: '#1a56db', label: 'Completed' },
   cancelled: { bg: '#fff5f5', color: '#e53e3e', label: 'Cancelled' },
 };
@@ -15,6 +18,7 @@ export default function PatientAppointments() {
   const [loading,      setLoading]      = useState(true);
   const [filter,       setFilter]       = useState('all');
   const [error,        setError]        = useState('');
+  const [joiningId,    setJoiningId]    = useState(null);
 
   useEffect(() => {
     // This will call appointment service once Member 3 builds it
@@ -27,6 +31,26 @@ export default function PatientAppointments() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleJoinCall = async (appointmentId) => {
+    try {
+      setJoiningId(appointmentId);
+      const sessionData = await getOrCreateSessionByAppointment(appointmentId);
+      const joinData = await joinSession(sessionData.session.sessionId, sessionData.join.participantToken);
+
+      if (joinData.meeting?.url) {
+        window.open(joinData.meeting.url, "_blank");
+        toast.success("Consultation room opened!");
+      } else {
+        throw new Error("No meeting URL received");
+      }
+    } catch (err) {
+      console.error("Video join error:", err);
+      toast.error(err.response?.data?.error || "Failed to enter consultation.");
+    } finally {
+      setJoiningId(null);
+    }
+  };
 
   const handleCancel = async (id) => {
     if (!window.confirm('Cancel this appointment?')) return;
@@ -44,12 +68,13 @@ export default function PatientAppointments() {
 
   return (
     <PatientLayout title="My Appointments" subtitle="Track and manage your bookings">
+      <Toaster position="top-center" />
 
       {error && <div style={s.error}>{error}</div>}
 
       {/* Filter tabs */}
       <div style={s.tabs}>
-        {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(f => (
+        {['all', 'pending', 'confirmed', 'accepted', 'completed', 'cancelled'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ ...s.tab, ...(filter === f ? s.tabActive : {}) }}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -97,11 +122,12 @@ export default function PatientAppointments() {
                   </span>
 
                   <div style={s.actions}>
-                    {/* Video join button — only if confirmed and has room link */}
-                    {ap.status === 'confirmed' && ap.videoRoomLink && (
-                      <a href={ap.videoRoomLink} target="_blank" rel="noreferrer" style={s.joinBtn}>
-                        Join Video →
                       </a>
+                        disabled={joiningId === ap._id}
+                        style={{ ...s.joinBtn, opacity: joiningId === ap._id ? 0.7 : 1 }}
+                      >
+                        {joiningId === ap._id ? 'Joining...' : 'Join Video →'}
+                      </button>
                     )}
                     {/* Cancel button — only for pending/confirmed */}
                     {(ap.status === 'pending' || ap.status === 'confirmed') && (

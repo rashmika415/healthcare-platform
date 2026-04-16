@@ -4,6 +4,8 @@ import Sidebar from "../../components/doctor/Sidebar";
 import StatCard from "../../components/doctor/StatCard";
 import AnalyticsChart from "../../components/doctor/AnalyticsChart";
 import RealCalendar from "../../components/doctor/RealCalendar";
+import { getOrCreateSessionByAppointment, joinSession } from "../../services/videoApi";
+import { toast, Toaster } from "react-hot-toast";
 import {
   CalendarDays, CheckCircle, Clock,
   Video, Activity, Syringe, ArrowUpRight,
@@ -141,6 +143,7 @@ export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [selected, setSelected]         = useState(null);
   const [doctorProfileId, setDoctorProfileId] = useState("");
+  const [joiningId, setJoiningId]       = useState(null);
 
   const user = getStoredUser();
 
@@ -222,6 +225,26 @@ export default function DoctorDashboard() {
     }
   };
 
+  const handleJoinCall = async (appointmentId) => {
+    try {
+      setJoiningId(appointmentId);
+      const sessionData = await getOrCreateSessionByAppointment(appointmentId);
+      const joinData = await joinSession(sessionData.session.sessionId, sessionData.join.participantToken);
+
+      if (joinData.meeting?.url) {
+        window.open(joinData.meeting.url, "_blank");
+        toast.success("Consultation room opened!");
+      } else {
+        throw new Error("No meeting URL received");
+      }
+    } catch (err) {
+      console.error("Video join error:", err);
+      toast.error(err.response?.data?.error || "Failed to enter consultation.");
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
   const todayList = appointments.filter(
     a => new Date(a.date).toDateString() === new Date().toDateString()
   );
@@ -235,6 +258,7 @@ export default function DoctorDashboard() {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
+      <Toaster position="top-center" />
       <Sidebar />
 
       <div className="flex-1 p-6 overflow-auto">
@@ -387,8 +411,19 @@ export default function DoctorDashboard() {
                   <button className="border border-slate-200 text-slate-600 text-xs font-semibold py-2.5 rounded-xl hover:bg-slate-50 transition">
                     Edit
                   </button>
-                  <button className="bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition shadow-lg shadow-blue-500/25">
-                    Chat
+                  <button 
+                    onClick={() => handleJoinCall(selected._id)}
+                    disabled={joiningId === selected._id}
+                    className="bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {joiningId === selected._id ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Joining...
+                      </>
+                    ) : (
+                      "Chat"
+                    )}
                   </button>
                 </div>
               </>
