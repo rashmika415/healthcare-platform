@@ -87,37 +87,43 @@ const getAppointmentsByPatientId = async (req, res) => {
 
 //create appointment
 const createappointment = async (req, res) => {
-    const {
-        patientId,
-        doctorId,
-        patientName,
-        doctorName,
-        specialization,
-        date,
-        time,
-        notes,
-    } = req.body;
-    let appointment;
-    try {
-        appointment = new Appointment({
-            patientId,
-            doctorId,
-            patientName,
-            doctorName,
-            specialization,
-            date,
-            time,
-            notes,
-        });
-        await appointment.save();
-    }
-    catch (error) {
-        console.log(error);
-    }   
-    if (!appointment) {
-        return res.status(500).json({ message: "Unable to create appointment" });
-    }   
-    return res.status(201).json({ appointment });
+
+const {
+patientId,
+doctorId,
+patientName,
+doctorName,
+specialization,
+date,
+time,
+notes
+} = req.body;
+
+try {
+
+const appointment = await Appointment.create({
+patientId,
+doctorId,
+patientName,
+doctorName,
+specialization,
+date,
+time,
+notes
+});
+
+await axios.post("http://localhost:3005/notifications/create", {
+patientId,
+appointmentId: appointment._id,
+type: "APPOINTMENT",
+message: `Appointment booked with Dr.${doctorName} on ${date} at ${time}`
+});
+
+res.status(201).json({ appointment });
+
+} catch (error) {
+res.status(500).json({ error: error.message });
+}
 };
 
 //Get appointment by id
