@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+
 const videoApi = axios.create({
   baseURL: 'http://localhost:3000/video', // Changed to go through the gateway
+
+
 });
 
 // Auto attach token to every request

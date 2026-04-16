@@ -15,12 +15,15 @@ function normalizeAppointmentBaseUrl(raw) {
 }
 
 function appointmentApiBases() {
+  const gatewayBase = normalizeAppointmentBaseUrl(
+    process.env.REACT_APP_API_BASE_URL
+  );
   const fromEnv = normalizeAppointmentBaseUrl(
     process.env.REACT_APP_APPOINTMENT_URL
   );
   return [
     ...new Set(
-      [fromEnv, "http://localhost:3000", "http://localhost:3003"].filter(Boolean)
+      [fromEnv, gatewayBase, "http://localhost:3100"].filter(Boolean)
     ),
   ];
 }

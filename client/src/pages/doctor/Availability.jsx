@@ -3,6 +3,11 @@ import api from "../../services/api";
 import Sidebar from "../../components/doctor/Sidebar";
 import Topbar from "../../components/doctor/Topbar";
 import { Clock, Plus, Trash2, CheckCircle, XCircle, Calendar } from "lucide-react";
+const SUMMARY_STYLES = {
+  blue: { bg: "bg-blue-50", text: "text-blue-500" },
+  green: { bg: "bg-green-50", text: "text-green-500" },
+  red: { bg: "bg-red-50", text: "text-red-500" },
+};
 
 const toDateKeyLocal = (value) => {
   const d = new Date(value);
@@ -134,7 +139,7 @@ const showMessage = (type, text) => {
   const filteredDates = selectedDate === "All" ? availableDates : [selectedDate];
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       <Sidebar />
 
       <div className="flex-1 p-6 overflow-auto">
@@ -173,8 +178,8 @@ const showMessage = (type, text) => {
             { label: "Inactive Slots", value: summary.inactiveSlots || 0, color: "red", icon: XCircle  },
           ].map(({ label, value, color, icon: Icon }) => (
             <div key={label} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-${color}-50`}>
-                <Icon size={18} className={`text-${color}-500`} />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${SUMMARY_STYLES[color]?.bg || "bg-slate-100"}`}>
+                <Icon size={18} className={SUMMARY_STYLES[color]?.text || "text-slate-500"} />
               </div>
               <div>
                 <p className="text-xs text-gray-400 font-medium">{label}</p>

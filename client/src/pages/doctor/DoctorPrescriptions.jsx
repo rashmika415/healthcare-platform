@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import Sidebar from "../../components/doctor/Sidebar";
+import Topbar from "../../components/doctor/Topbar";
 import PrescriptionForm from "../../components/doctor/PrescriptionForm";
 import {
   Plus, Pill, User, Calendar, FileText,
@@ -13,6 +14,12 @@ const STATUS_CONFIG = {
   active:    { label: "Active",    color: "bg-emerald-100 text-emerald-600", dot: "bg-emerald-500" },
   completed: { label: "Completed", color: "bg-blue-100 text-blue-600",       dot: "bg-blue-500"    },
   cancelled: { label: "Cancelled", color: "bg-rose-100 text-rose-500",       dot: "bg-rose-500"    },
+};
+const STAT_CARD_CLASSES = {
+  blue: { bg: "bg-blue-50", text: "text-blue-500" },
+  emerald: { bg: "bg-emerald-50", text: "text-emerald-500" },
+  indigo: { bg: "bg-indigo-50", text: "text-indigo-500" },
+  rose: { bg: "bg-rose-50", text: "text-rose-500" },
 };
 
 const RX_CACHE_PREFIX = "healthcare_doctor_prescriptions_v1:";
@@ -171,10 +178,11 @@ export default function DoctorPrescriptions() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       <Sidebar />
 
       <div className="flex-1 p-6 overflow-auto">
+        <Topbar />
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -212,8 +220,8 @@ export default function DoctorPrescriptions() {
             { label: "Cancelled", value: stats.cancelled, color: "rose",    icon: XCircle     },
           ].map(({ label, value, color, icon: Icon }) => (
             <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl bg-${color}-50 flex items-center justify-center flex-shrink-0`}>
-                <Icon size={17} className={`text-${color}-500`} />
+              <div className={`w-10 h-10 rounded-xl ${STAT_CARD_CLASSES[color]?.bg || "bg-slate-100"} flex items-center justify-center flex-shrink-0`}>
+                <Icon size={17} className={STAT_CARD_CLASSES[color]?.text || "text-slate-500"} />
               </div>
               <div>
                 <p className="text-xs text-slate-400 font-medium">{label}</p>

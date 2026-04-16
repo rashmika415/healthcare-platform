@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle, Download, FileText, Search, XCircle } from "lucide-react";
+import { CheckCircle, Download, FileText, Search, XCircle, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/doctor/Sidebar";
-import { getDoctorSharedReports, getPatientReportDownloadUrl } from "../../services/patientApi";
+import Topbar from "../../components/doctor/Topbar";
+import {
+  addDoctorNoteToReport,
+  getDoctorSharedReports,
+  getPatientReportDownloadUrl,
+} from "../../services/patientApi";
 
 export default function Reports() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [message, setMessage] = useState(null);
   const [search, setSearch] = useState("");
+  const [noteFor, setNoteFor] = useState(null);
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   const filtered = useMemo(() => {
     const q = String(search || "").trim().toLowerCase();
@@ -77,10 +87,49 @@ export default function Reports() {
     }
   };
 
+  const openNote = (x) => {
+    const report = x?.report || {};
+    setNoteFor({
+      reportId: report?._id,
+      patientName: x?.patient?.name,
+      title: report?.title,
+    });
+    setNoteText("");
+  };
+
+  const saveNote = async () => {
+    if (!noteFor?.reportId) return;
+    const text = String(noteText || "").trim();
+    if (!text) {
+      setMessage({ type: "error", text: "Please type a note before sending." });
+      setTimeout(() => setMessage(null), 2500);
+      return;
+    }
+
+    try {
+      setSavingNote(true);
+      await addDoctorNoteToReport(noteFor.reportId, text);
+      setMessage({ type: "success", text: "Note sent to patient" });
+      setTimeout(() => setMessage(null), 2500);
+      setNoteFor(null);
+      setNoteText("");
+      fetchSharedReports();
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.response?.data?.error || "Failed to send note",
+      });
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       <Sidebar />
       <div className="flex-1 p-6 overflow-auto">
+        <Topbar />
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Reports</h1>
@@ -148,7 +197,6 @@ export default function Reports() {
               const patient = x?.patient || {};
               const report = x?.report || {};
               const reportId = report?._id ? String(report._id) : `${idx}`;
-
               return (
                 <div
                   key={reportId}
@@ -195,7 +243,33 @@ export default function Reports() {
                       )}
                     </div>
 
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap gap-2 flex-shrink-0 items-center justify-end">
+                      <button
+                        onClick={() =>
+                          navigate("/doctor/prescriptions", {
+                            state: {
+                              patientUserId: patient.userId,
+                              patientName: patient.name,
+                              patientEmail: patient.email,
+                              reportId: report._id,
+                            },
+                          })
+                        }
+                        className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition inline-flex items-center gap-1.5"
+                        title="Add prescription"
+                      >
+                        <Plus size={14} />
+                        Add Prescription
+                      </button>
+
+                      <button
+                        onClick={() => openNote(x)}
+                        className="text-xs font-semibold px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 transition inline-flex items-center gap-1.5 border border-blue-100"
+                        title="Send note to patient"
+                      >
+                        Add Note
+                      </button>
+
                       <button
                         onClick={() => openReport(report._id)}
                         className="text-xs font-semibold px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition"
@@ -214,6 +288,57 @@ export default function Reports() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Note modal */}
+        {noteFor?.reportId && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Send note
+                  </p>
+                  <p className="text-sm font-bold text-slate-800 truncate">
+                    {noteFor.patientName || "Patient"} • {noteFor.title || "Report"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setNoteFor(null); setNoteText(""); }}
+                  className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5">
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  rows={5}
+                  placeholder="Write your note for the patient…"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+                <div className="flex justify-end gap-2 mt-4">
+                  <button
+                    onClick={() => { setNoteFor(null); setNoteText(""); }}
+                    className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                    disabled={savingNote}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveNote}
+                    className="text-xs font-semibold px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition disabled:opacity-60"
+                    disabled={savingNote}
+                  >
+                    {savingNote ? "Sending..." : "Send Note"}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -1,0 +1,32 @@
+#! kustomization.yaml
+# Generated code, do not edit
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+    - 0-healthcare-platform-namespace.yaml
+    - api-gateway-deployment.yaml
+    - api-gateway-expose.yaml
+    - api-gateway-service.yaml
+    - appointment-service-deployment.yaml
+    - appointment-service-expose.yaml
+    - appointment-service-service.yaml
+    - client-deployment.yaml
+    - client-expose.yaml
+    - client-service.yaml
+    - default-network-policy.yaml
+    - doctor-service-deployment.yaml
+    - doctor-service-expose.yaml
+    - doctor-service-service.yaml
+    - mongo-deployment.yaml
+    - mongo-expose.yaml
+    - mongo-mongo-data-persistentVolumeClaim.yaml
+    - mongo-service.yaml
+    - patient-service-deployment.yaml
+    - patient-service-expose.yaml
+    - patient-service-service.yaml
+    - payment-service-deployment.yaml
+    - payment-service-expose.yaml
+    - payment-service-service.yaml
+    - video-service-deployment.yaml
+    - video-service-expose.yaml
+    - video-service-service.yaml

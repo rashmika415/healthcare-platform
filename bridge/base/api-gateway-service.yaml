@@ -1,0 +1,23 @@
+# check if there is at least one published port
+
+#! api-gateway-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: api-gateway-published
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: api-gateway
+spec:
+    selector:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: api-gateway
+    ports:
+        - name: api-gatewa-3000
+          port: 3000
+          protocol: TCP
+          targetPort: api-gatewa-3000
+
+# check if there is at least one published port

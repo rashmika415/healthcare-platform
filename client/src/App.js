@@ -36,6 +36,8 @@ import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
 import Profile from "./pages/doctor/Profile";
 import Availability from "./pages/doctor/Availability";
 import ConsultationHub from './pages/video/ConsultationHub';
+import DosageGuidelines from "./pages/doctor/DosageGuidelines";
+import CaseStudies from "./pages/doctor/CaseStudies";
 import VideoServiceTest from './pages/video/VideoServiceTest';
 
 // //Appointment pages
@@ -133,6 +135,12 @@ export default function App() {
           } />
           <Route path="/doctor/availability" element={
             <PrivateRoute role="doctor"><Availability /></PrivateRoute>
+          } />
+          <Route path="/doctor/dosage-guidelines" element={
+            <PrivateRoute role="doctor"><DosageGuidelines /></PrivateRoute>
+          } />
+          <Route path="/doctor/case-studies" element={
+            <PrivateRoute role="doctor"><CaseStudies /></PrivateRoute>
           } />
 
           {/* Consultation Hub (Separate frontend part) */}

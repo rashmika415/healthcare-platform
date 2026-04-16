@@ -1,0 +1,49 @@
+#! video-service-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: video-service
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: video-service
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: healthcare-platform
+            com.docker.compose.service: video-service
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: healthcare-platform
+                com.docker.compose.service: video-service
+                com.docker.compose.network.default: "true"
+        spec:
+            containers:
+                - name: video-service
+                  image: healthcare-platform-video-service
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: JWT_SECRET
+                      value: "change-me-jwt-secret"
+                    - name: MONGO_URI
+                      value: "mongodb://mongo:27017/videodb"
+                    - name: PORT
+                      value: "3006"
+                  livenessProbe:
+                    exec:
+                        command:
+                            - /bin/sh
+                            - -c
+                            - node -e "require('http').get('http://127.0.0.1:3006/health', (r) => process.exit(r.statusCode === 200 ? 0: 1)).on('error', () => process.exit(1))"
+                    periodSeconds: 15
+                    initialDelaySeconds: 25
+                    timeoutSeconds: 5
+                    failureThreshold: 10
+                  ports:
+                    - name: video-serv-3006
+                      containerPort: 3006

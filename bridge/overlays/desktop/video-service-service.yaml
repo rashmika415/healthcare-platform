@@ -1,0 +1,9 @@
+#! video-service-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: video-service-published
+    namespace: healthcare-platform
+spec:
+    type: LoadBalancer

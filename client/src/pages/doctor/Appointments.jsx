@@ -157,9 +157,10 @@ export default function DoctorAppointments() {
       <Toaster position="top-center" />
       <Sidebar />
       <div className="flex-1 p-6 overflow-auto">
+      <Topbar />
 
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
         <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Appointments</h1>
         <p className="text-sm text-slate-400 mt-0.5">Manage your patient bookings</p>
       </div>
