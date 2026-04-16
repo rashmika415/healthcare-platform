@@ -30,31 +30,10 @@ const getVerifiedDoctorsForBooking = async (req, res) => {
 // Get all appointments
 const getallappointments = async (req, res) => {
     try {
-        const appointments = await Appointment.find();
+        const appointments = await Appointment.find()
+            .sort({ createdAt: -1 });
 
-        //  LOOP + FETCH DATA
-        const enrichedAppointments = await Promise.all(
-            appointments.map(async (appt) => {
-
-                // CALL Patient Service
-                const patientRes = await axios.get(
-                    `http://localhost:3001/patients/${appt.patientId}`
-                );
-
-                // CALL Doctor Service
-                const doctorRes = await axios.get(
-                    `http://localhost:3002/doctors/${appt.doctorId}`
-                );
-
-                return {
-                    ...appt.toObject(),
-                    patient: patientRes.data,
-                    doctor: doctorRes.data
-                };
-            })
-        );
-
-        return res.status(200).json({ appointments: enrichedAppointments });
+        return res.status(200).json({ appointments });
 
     } catch (error) {
         console.log(error);

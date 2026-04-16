@@ -49,6 +49,7 @@ import Payment from './pages/payment/Payment';
 
 // // Admin pages
 // import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminAppointments from "./pages/admin/AdminAppointments";
 
 export default function App() {
   return (
@@ -187,6 +188,7 @@ export default function App() {
             <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
           }/>
           */}
+          <Route path="/admin/appointments" element={<AdminAppointments />} />
 
           {/* ── Catch all ────────────────────────── */}
           <Route path="*" element={<Navigate to="/" />} />
