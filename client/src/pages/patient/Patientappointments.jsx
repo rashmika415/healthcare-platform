@@ -122,7 +122,10 @@ export default function PatientAppointments() {
                   </span>
 
                   <div style={s.actions}>
-                      </a>
+                    {/* Video join button — only if confirmed/accepted */}
+                    {(ap.status === 'confirmed' || ap.status === 'accepted') && (
+                      <button 
+                        onClick={() => handleJoinCall(ap._id)} 
                         disabled={joiningId === ap._id}
                         style={{ ...s.joinBtn, opacity: joiningId === ap._id ? 0.7 : 1 }}
                       >
