@@ -115,6 +115,7 @@ const {
 patientId,
 doctorId,
 patientName,
+patientEmail,
 doctorName,
 specialization,
 date,
@@ -128,6 +129,7 @@ const appointment = await Appointment.create({
 patientId,
 doctorId,
 patientName,
+patientEmail,
 doctorName,
 specialization,
 date,
@@ -168,41 +170,46 @@ const getappointmentbyid = async (req, res) => {
 
 //update appointment
 const updateappointment = async (req, res) => {
-    const id = req.params.id;
-    const {
-        patientId,
-        doctorId,
-        patientName,
-        doctorName,
-        specialization,
-        date,
-        time,
-        status,
-        paymentStatus,
-        notes,
-    } = req.body;
-    let appointment;
-    try {
-        appointment = await Appointment.findByIdAndUpdate(id, { 
-            patientId,
-            doctorId,
-            patientName,
-            doctorName,
-            specialization,
-            date,
-            time,
-            status,
-            paymentStatus,
-            notes,
-        }, { new: true });
-    }   
-    catch (error) {
-        console.log(error);
-    }   
+  const id = req.params.id;
+
+  try {
+    const updateData = {};
+
+    const allowedFields = [
+      "patientId",
+      "doctorId",
+      "patientName",
+      "patientEmail",
+      "doctorName",
+      "specialization",
+      "date",
+      "time",
+      "status",
+      "paymentStatus",
+      "notes",
+    ];
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    const appointment = await Appointment.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    );
+
     if (!appointment) {
-        return res.status(404).json({ message: "Unable to update appointment" });
+      return res.status(404).json({ message: "Unable to update appointment" });
     }
+
     return res.status(200).json({ appointment });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: error.message });
+  }
 };
 
 //delete appointment
