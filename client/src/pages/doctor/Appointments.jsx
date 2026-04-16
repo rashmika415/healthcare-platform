@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import api from "../../services/api";
 import PrescriptionForm from "../../components/doctor/PrescriptionForm";
 import Sidebar from "../../components/doctor/Sidebar";
-import { getOrCreateSessionByAppointment, joinSession } from "../../services/videoApi";
 import { toast, Toaster } from "react-hot-toast";
 
 const STATUS_STYLES = {
@@ -21,7 +20,6 @@ export default function DoctorAppointments() {
   // New states for modal
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [joiningId, setJoiningId] = useState(null);
 
   const getStoredUser = () => {
     try {
@@ -131,25 +129,6 @@ export default function DoctorAppointments() {
     };
   }, []);
 
-  const handleJoinCall = async (appointmentId) => {
-    try {
-      setJoiningId(appointmentId);
-      const sessionData = await getOrCreateSessionByAppointment(appointmentId);
-      const joinData = await joinSession(sessionData.session.sessionId, sessionData.join.participantToken);
-
-      if (joinData.meeting?.url) {
-        window.open(joinData.meeting.url, "_blank");
-        toast.success("Consultation room opened!");
-      } else {
-        throw new Error("No meeting URL received");
-      }
-    } catch (err) {
-      console.error("Video join error:", err);
-      toast.error(err.response?.data?.error || "Failed to enter consultation.");
-    } finally {
-      setJoiningId(null);
-    }
-  };
 
   const handleAction = async (id, status) => {
     try {
@@ -294,15 +273,8 @@ export default function DoctorAppointments() {
                 )}
 
                 {/* Add Prescription or Join Call for accepted */}
-                {ap.status === "accepted" && (
+                {ap.status === "accepted" && String(ap.paymentStatus || '').toLowerCase() !== 'completed' && (
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleJoinCall(ap._id)}
-                      disabled={joiningId === ap._id}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition ${joiningId === ap._id ? 'animate-pulse' : ''}`}
-                    >
-                      {joiningId === ap._id ? "Joining..." : "Join Call"}
-                    </button>
 
                     <button
                       onClick={() => {

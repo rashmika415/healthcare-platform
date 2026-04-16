@@ -413,14 +413,17 @@ export default function DoctorDashboard() {
                   </button>
                   <button 
                     onClick={() => handleJoinCall(selected._id)}
-                    disabled={joiningId === selected._id}
-                    className="bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    disabled={joiningId === selected._id || String(selected.paymentStatus || '').toLowerCase() === 'completed'}
+                    className={`bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 
+                      ${(joiningId === selected._id || String(selected.paymentStatus || '').toLowerCase() === 'completed') ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
                     {joiningId === selected._id ? (
                       <>
                         <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                         Joining...
                       </>
+                    ) : String(selected.paymentStatus || '').toLowerCase() === 'completed' ? (
+                      "Consultation Finished"
                     ) : (
                       "Chat"
                     )}

@@ -2,8 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import PatientLayout from "../../pages/patient/Patientlayout ";
-import { getOrCreateSessionByAppointment, joinSession } from "../../services/videoApi";
-import { toast, Toaster } from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 
 /** Strip trailing slash and accidental `/appointments` so env can be service root or full prefix */
 function normalizeAppointmentBaseUrl(raw) {
@@ -81,7 +80,6 @@ function AppointmentDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [joiningId, setJoiningId] = useState(null);
 
   const patientId = useMemo(() => patientIdFromUser(user), [user]);
 
@@ -146,25 +144,6 @@ function AppointmentDashboard() {
     };
   }, [user, authLoading, patientId]);
 
-  const handleJoinCall = async (appointmentId) => {
-    try {
-      setJoiningId(appointmentId);
-      const sessionData = await getOrCreateSessionByAppointment(appointmentId);
-      const joinData = await joinSession(sessionData.session.sessionId, sessionData.join.participantToken);
-
-      if (joinData.meeting?.url) {
-        window.open(joinData.meeting.url, "_blank");
-        toast.success("Consultation room opened!");
-      } else {
-        throw new Error("No meeting URL received");
-      }
-    } catch (err) {
-      console.error("Video join error:", err);
-      toast.error(err.response?.data?.error || "Failed to enter consultation.");
-    } finally {
-      setJoiningId(null);
-    }
-  };
 
   return (
     <PatientLayout title="Appointments" subtitle="View all your medical appointments">
@@ -248,32 +227,6 @@ function AppointmentDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end gap-3 flex-shrink-0">
-                        {/* Video Join Button */}
-                        {['accepted', 'booked', 'confirmed'].includes(String(appointment.status || '').toLowerCase()) && (
-                          <button
-                            onClick={() => handleJoinCall(appointment._id)}
-                            disabled={joiningId === appointment._id}
-                            className={`px-5 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm
-                              ${joiningId === appointment._id 
-                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                                : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:scale-95'
-                              }`}
-                          >
-                            {joiningId === appointment._id ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
-                                Joining...
-                              </>
-                            ) : (
-                              <>
-                                <span>🎥</span>
-                                Join Video Call
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
                     </div>
                   </div>
                 ))}
