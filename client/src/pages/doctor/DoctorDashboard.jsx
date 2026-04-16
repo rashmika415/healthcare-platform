@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import api from "../../services/api";
 import Sidebar from "../../components/doctor/Sidebar";
 import RealCalendar from "../../components/doctor/RealCalendar";
+import { getOrCreateSessionByAppointment, joinSession } from "../../services/videoApi";
+import { toast, Toaster } from "react-hot-toast";
 import {
   Video,
   Activity,
@@ -220,6 +222,7 @@ export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [selected, setSelected] = useState(null);
   const [doctorProfileId, setDoctorProfileId] = useState("");
+  const [joiningId, setJoiningId]       = useState(null);
 
   const user = getStoredUser();
 
@@ -302,6 +305,26 @@ export default function DoctorDashboard() {
     }
   };
 
+  const handleJoinCall = async (appointmentId) => {
+    try {
+      setJoiningId(appointmentId);
+      const sessionData = await getOrCreateSessionByAppointment(appointmentId);
+      const joinData = await joinSession(sessionData.session.sessionId, sessionData.join.participantToken);
+
+      if (joinData.meeting?.url) {
+        window.open(joinData.meeting.url, "_blank");
+        toast.success("Consultation room opened!");
+      } else {
+        throw new Error("No meeting URL received");
+      }
+    } catch (err) {
+      console.error("Video join error:", err);
+      toast.error(err.response?.data?.error || "Failed to enter consultation.");
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
   const todayList = appointments.filter(
     (a) => new Date(a.date).toDateString() === new Date().toDateString()
   );
@@ -315,7 +338,8 @@ export default function DoctorDashboard() {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
+    <div className="flex min-h-screen bg-slate-50">
+      <Toaster position="top-center" />
       <Sidebar />
 
       <div className="flex-1 p-6 overflow-auto">
@@ -479,15 +503,27 @@ export default function DoctorDashboard() {
                     <Video size={22} />
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Link
-                    to="/video-test"
-                    className="px-4 py-2 rounded-xl bg-white text-indigo-700 text-sm font-semibold hover:bg-indigo-50 transition"
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="border border-slate-200 text-slate-600 text-xs font-semibold py-2.5 rounded-xl hover:bg-slate-50 transition">
+                    Edit
+                  </button>
+                  <button 
+                    onClick={() => handleJoinCall(selected._id)}
+                    disabled={joiningId === selected._id || String(selected.paymentStatus || '').toLowerCase() === 'completed'}
+                    className={`bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 
+                      ${(joiningId === selected._id || String(selected.paymentStatus || '').toLowerCase() === 'completed') ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
-                    Open Live Chat
-                  </Link>
-                  <button className="px-4 py-2 rounded-xl bg-white/20 text-white text-sm font-semibold hover:bg-white/30 transition">
-                    Invite Patient
+                    {joiningId === selected._id ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Joining...
+                      </>
+                    ) : String(selected.paymentStatus || '').toLowerCase() === 'completed' ? (
+                      "Consultation Finished"
+                    ) : (
+                      "Chat"
+                    )}
                   </button>
                 </div>
               </div>

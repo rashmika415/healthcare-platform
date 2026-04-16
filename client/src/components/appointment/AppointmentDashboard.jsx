@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import PatientLayout from "../../pages/patient/Patientlayout ";
+import { Toaster } from "react-hot-toast";
 
 /** Strip trailing slash and accidental `/appointments` so env can be service root or full prefix */
 function normalizeAppointmentBaseUrl(raw) {
@@ -146,8 +147,10 @@ function AppointmentDashboard() {
     };
   }, [user, authLoading, patientId]);
 
+
   return (
     <PatientLayout title="Appointments" subtitle="View all your medical appointments">
+      <Toaster position="top-center" />
       <div className="flex flex-col gap-6">
         {loading && (
           <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 max-w-5xl mx-auto">
@@ -226,6 +229,7 @@ function AppointmentDashboard() {
                           </div>
                         </div>
                       </div>
+
                     </div>
                   </div>
                 ))}

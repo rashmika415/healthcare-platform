@@ -17,6 +17,7 @@ export default function Navbar() {
       return [
         { label: 'Dashboard', path: '/patient/dashboard' },
         { label: 'Appointments', path: '/patient/appointments' },
+        { label: 'Consultations', path: '/video/hub' },
         { label: 'Medical Reports', path: '/patient/reports' },
         { label: 'Prescriptions', path: '/patient/prescriptions' },
         { label: 'Profile', path: '/patient/profile' },
@@ -26,6 +27,7 @@ export default function Navbar() {
       return [
         { label: 'Dashboard', path: '/doctor/dashboard' },
         { label: 'Appointments', path: '/doctor/appointments' },
+        { label: 'Consultations', path: '/video/hub' },
         { label: 'Availability', path: '/doctor/availability' },
         { label: 'Prescriptions', path: '/doctor/prescriptions' },
         { label: 'Profile', path: '/doctor/profile' },

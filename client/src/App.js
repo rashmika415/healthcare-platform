@@ -16,6 +16,7 @@ import DoctorPublicProfile from './pages/public/DoctorPublicProfile';
 import AdminDashboard    from './pages/admin/AdminDashboard';
 import AdminDoctors      from './pages/admin/AdminDoctors';
 import AdminPatients     from './pages/admin/AdminPatients';
+import AdminVideoSessions from './pages/admin/AdminVideoSessions';
 
 // // Patient pages
 import PatientSetup         from './pages/patient/Patientsetupandprofile';
@@ -34,6 +35,7 @@ import Reports from "./pages/doctor/Reports";
 import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
 import Profile from "./pages/doctor/Profile";
 import Availability from "./pages/doctor/Availability";
+import ConsultationHub from './pages/video/ConsultationHub';
 import DosageGuidelines from "./pages/doctor/DosageGuidelines";
 import CaseStudies from "./pages/doctor/CaseStudies";
 import VideoServiceTest from './pages/video/VideoServiceTest';
@@ -80,6 +82,9 @@ export default function App() {
 } />
 <Route path="/admin/patients" element={
   <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
+} />
+<Route path="/admin/video" element={
+  <PrivateRoute role="admin"><AdminVideoSessions /></PrivateRoute>
 } />
 
           {/* ── Patient ──────────────────────────── */}
@@ -136,6 +141,11 @@ export default function App() {
           } />
           <Route path="/doctor/case-studies" element={
             <PrivateRoute role="doctor"><CaseStudies /></PrivateRoute>
+          } />
+
+          {/* Consultation Hub (Separate frontend part) */}
+          <Route path="/video/hub" element={
+            <PrivateRoute><ConsultationHub /></PrivateRoute>
           } />
 
           {/* Video Service standalone test page (your part) */}

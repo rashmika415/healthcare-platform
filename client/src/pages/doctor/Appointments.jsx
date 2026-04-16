@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../services/api";
 import PrescriptionForm from "../../components/doctor/PrescriptionForm";
 import Sidebar from "../../components/doctor/Sidebar";
-import Topbar from "../../components/doctor/Topbar";
+import { toast, Toaster } from "react-hot-toast";
 
 const STATUS_STYLES = {
   pending: "bg-yellow-100 text-yellow-700",
@@ -129,6 +129,7 @@ export default function DoctorAppointments() {
     };
   }, []);
 
+
   const handleAction = async (id, status) => {
     try {
       // Primary: appointment-service update route
@@ -152,7 +153,8 @@ export default function DoctorAppointments() {
       : appointments.filter(a => a.status === filter);
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
+    <div className="flex min-h-screen bg-slate-50">
+      <Toaster position="top-center" />
       <Sidebar />
       <div className="flex-1 p-6 overflow-auto">
       <Topbar />
@@ -271,17 +273,20 @@ export default function DoctorAppointments() {
                   </div>
                 )}
 
-                {/* Add Prescription for accepted */}
-                {ap.status === "accepted" && (
-                  <button
-                    onClick={() => {
-                      setSelectedPatient(ap.patientUserId);
-                      setShowModal(true);
-                    }}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
-                  >
-                    Add Prescription
-                  </button>
+                {/* Add Prescription or Join Call for accepted */}
+                {ap.status === "accepted" && String(ap.paymentStatus || '').toLowerCase() !== 'completed' && (
+                  <div className="flex gap-2">
+
+                    <button
+                      onClick={() => {
+                        setSelectedPatient(ap.patientUserId);
+                        setShowModal(true);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+                    >
+                      Add Prescription
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
