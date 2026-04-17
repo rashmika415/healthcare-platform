@@ -1,0 +1,18 @@
+#! doctor-service-expose.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: doctor-service
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: doctor-service
+spec:
+    selector:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: doctor-service
+    ports:
+        - name: doctor-ser-3002
+          port: 3002
+          targetPort: doctor-ser-3002

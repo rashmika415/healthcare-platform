@@ -1,0 +1,449 @@
+{
+  "info": {
+    "name": "Healthcare Platform - Patient Service",
+    "description": "Complete test collection for Patient Service API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 - AUTH",
+      "item": [
+        {
+          "name": "Register Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rashmika\",\n  \"email\": \"rashmika@gmail.com\",\n  \"password\": \"1234\",\n  \"role\": \"patient\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login Patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('token', res.token);",
+                  "  console.log('Token saved automatically');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"rashmika@gmail.com\",\n  \"password\": \"1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Verify Token (auth/me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Login Without Token (should 401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/patients/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - PATIENT PROFILE",
+      "item": [
+        {
+          "name": "Create Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0771234567\",\n  \"dateOfBirth\": \"1998-04-22\",\n  \"gender\": \"female\",\n  \"bloodGroup\": \"B+\",\n  \"address\": \"45 Galle Road, Colombo 03\",\n  \"emergencyContact\": {\n    \"name\": \"Kumari Silva\",\n    \"phone\": \"0779876543\",\n    \"relationship\": \"Mother\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0789999999\",\n  \"address\": \"123 Kandy Road, Peradeniya\",\n  \"bloodGroup\": \"O+\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - MEDICAL REPORTS",
+      "item": [
+        {
+          "name": "Upload Report (PDF or Image + Metadata)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reportType",
+                  "type": "text",
+                  "value": "lab"
+                },
+                {
+                  "key": "title",
+                  "type": "text",
+                  "value": "CBC Blood Test"
+                },
+                {
+                  "key": "reportDate",
+                  "type": "text",
+                  "value": "2026-04-12"
+                },
+                {
+                  "key": "description",
+                  "type": "text",
+                  "value": "Annual blood profile result"
+                },
+                {
+                  "key": "hospitalOrLabName",
+                  "type": "text",
+                  "value": "City Lab"
+                },
+                {
+                  "key": "tags",
+                  "type": "text",
+                  "value": "blood,annual"
+                },
+                {
+                  "key": "isCritical",
+                  "type": "text",
+                  "value": "false"
+                },
+                {
+                  "key": "report",
+                  "type": "file",
+                  "src": "",
+                  "description": "Select a PDF or image file from your computer"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports"]
+            }
+          }
+        },
+        {
+          "name": "Get All Reports (Filters + Pagination)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports?page=1&limit=10&type=lab&status=active&search=blood",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "type", "value": "lab" },
+                { "key": "status", "value": "active" },
+                { "key": "search", "value": "blood" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Report By Id",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE"]
+            }
+          }
+        },
+        {
+          "name": "Update Report Metadata",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"CBC Blood Test (Updated)\",\n  \"description\": \"Updated after doctor review\",\n  \"isCritical\": true,\n  \"tags\": [\"blood\", \"follow-up\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE"]
+            }
+          }
+        },
+        {
+          "name": "Share Report With Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorUserId\": \"PASTE_DOCTOR_USER_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE/share",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE", "share"]
+            }
+          }
+        },
+        {
+          "name": "Unshare Report With Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorUserId\": \"PASTE_DOCTOR_USER_ID_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE/unshare",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE", "unshare"]
+            }
+          }
+        },
+        {
+          "name": "Archive Report",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE/archive",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE", "archive"]
+            }
+          }
+        },
+        {
+          "name": "Get Signed Download Url",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/download/PASTE_REPORT_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "download", "PASTE_REPORT_ID_HERE"]
+            }
+          }
+        },
+        {
+          "name": "Delete Report",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/reports/PASTE_REPORT_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "reports", "PASTE_REPORT_ID_HERE"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - PRESCRIPTIONS & HISTORY",
+      "item": [
+        {
+          "name": "Get Prescriptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/prescriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "prescriptions"]
+            }
+          }
+        },
+        {
+          "name": "Get Medical History",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "history"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - INTERNAL ROUTES",
+      "item": [
+        {
+          "name": "Add Prescription (Doctor Service calls this)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientUserId\": \"PASTE_YOUR_USER_ID_HERE\",\n  \"prescription\": {\n    \"doctorId\": \"doc123\",\n    \"doctorName\": \"Dr. Kamal Perera\",\n    \"medicines\": [\n      {\n        \"name\": \"Paracetamol\",\n        \"dosage\": \"500mg\",\n        \"duration\": \"5 days\",\n        \"notes\": \"Take after meals\"\n      },\n      {\n        \"name\": \"Vitamin C\",\n        \"dosage\": \"1000mg\",\n        \"duration\": \"7 days\",\n        \"notes\": \"Take in the morning\"\n      }\n    ],\n    \"instructions\": \"Rest well and drink plenty of water\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/internal/add-prescription",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "internal", "add-prescription"]
+            }
+          }
+        },
+        {
+          "name": "Add Medical History (Appointment Service calls this)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientUserId\": \"PASTE_YOUR_USER_ID_HERE\",\n  \"historyEntry\": {\n    \"doctorName\": \"Dr. Kamal Perera\",\n    \"specialty\": \"General Medicine\",\n    \"date\": \"2026-03-24\",\n    \"diagnosis\": \"Mild fever and throat infection\",\n    \"notes\": \"Prescribed antibiotics for 5 days\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/patients/internal/add-history",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "internal", "add-history"]
+            }
+          }
+        },
+        {
+          "name": "Get Patient By UserID (Doctor calls this)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patients/internal/PASTE_USER_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["patients", "internal", "PASTE_USER_ID_HERE"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

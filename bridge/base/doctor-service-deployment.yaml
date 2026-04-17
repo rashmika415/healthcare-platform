@@ -1,0 +1,55 @@
+#! doctor-service-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: doctor-service
+    namespace: healthcare-platform
+    labels:
+        com.docker.compose.project: healthcare-platform
+        com.docker.compose.service: doctor-service
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: healthcare-platform
+            com.docker.compose.service: doctor-service
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: healthcare-platform
+                com.docker.compose.service: doctor-service
+                com.docker.compose.network.default: "true"
+        spec:
+            containers:
+                - name: doctor-service
+                  image: healthcare-platform-doctor-service
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: ADMIN_EMAIL
+                      value: "admin@example.com"
+                    - name: EMAIL_PASS
+                      value: "change-me-email-pass"
+                    - name: EMAIL_USER
+                      value: "change-me-email-user"
+                    - name: JWT_SECRET
+                      value: "change-me-jwt-secret"
+                    - name: MONGO_URI
+                      value: "mongodb://mongo:27017/doctordb"
+                    - name: PORT
+                      value: "3002"
+                  livenessProbe:
+                    exec:
+                        command:
+                            - /bin/sh
+                            - -c
+                            - node -e "require('http').get('http://127.0.0.1:3002/', (r) => process.exit(r.statusCode < 500 ? 0: 1)).on('error', () => process.exit(1))"
+                    periodSeconds: 15
+                    initialDelaySeconds: 25
+                    timeoutSeconds: 5
+                    failureThreshold: 10
+                  ports:
+                    - name: doctor-ser-3002
+                      containerPort: 3002
