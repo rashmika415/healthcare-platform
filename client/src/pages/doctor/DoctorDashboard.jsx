@@ -645,6 +645,7 @@ export default function DoctorDashboard() {
                   </button>
                 </div>
               </div>
+            </div>
 
               <div className="rounded-[26px] border border-white/70 bg-white/90 backdrop-blur-xl p-4 shadow-[0_25px_60px_-30px_rgba(15,23,42,0.30)]">
                 <p className="text-xs text-slate-400">Dashboard summary</p>
