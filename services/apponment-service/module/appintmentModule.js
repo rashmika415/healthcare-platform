@@ -14,6 +14,10 @@ const Appointment = new mongoose.Schema({
     type: String,
     required: true
     },
+     patientEmail: {
+    type: String,
+    required: true
+  },
     doctorName: {   
     type: String,
     required: true

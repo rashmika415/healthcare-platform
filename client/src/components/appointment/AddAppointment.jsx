@@ -13,6 +13,7 @@ function AddAppointment() {
     patientId: "",
     doctorId: "",
     patientName: "",
+    patientEmail: "", 
     doctorName: "",
     specialization: "",
     date: "",
@@ -30,6 +31,7 @@ function AddAppointment() {
         ...prev,
         patientId: "",
         patientName: "",
+        patientEmail: "",
       }));
       return;
     }
@@ -40,6 +42,7 @@ function AddAppointment() {
       ...prev,
       patientId,
       patientName: user.name || "",
+      patientEmail: user.email || "",
     }));
   }, [user, authLoading]);
 
@@ -112,6 +115,7 @@ function AddAppointment() {
         patientId,
         doctorId: "",
         patientName: user?.name || "",
+        patientEmail: user?.email || "",
         doctorName: "",
         specialization: "",
         date: "",
@@ -166,6 +170,16 @@ function AddAppointment() {
                 />
               </div>
             </div>
+            <div>
+          <label className="text-sm font-semibold">Email</label>
+          <input
+            type="email"
+            name="patientEmail"
+            value={formData.patientEmail}
+            readOnly
+            className="w-full bg-blue-50 p-3 rounded-xl"
+          />
+        </div>
 
             {/* Doctor */}
             <div className="grid gap-5 md:grid-cols-2">

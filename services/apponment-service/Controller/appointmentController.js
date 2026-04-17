@@ -30,31 +30,10 @@ const getVerifiedDoctorsForBooking = async (req, res) => {
 // Get all appointments
 const getallappointments = async (req, res) => {
     try {
-        const appointments = await Appointment.find();
+        const appointments = await Appointment.find()
+            .sort({ createdAt: -1 });
 
-        //  LOOP + FETCH DATA
-        const enrichedAppointments = await Promise.all(
-            appointments.map(async (appt) => {
-
-                // CALL Patient Service
-                const patientRes = await axios.get(
-                    `http://localhost:3001/patients/${appt.patientId}`
-                );
-
-                // CALL Doctor Service
-                const doctorRes = await axios.get(
-                    `http://localhost:3002/doctors/${appt.doctorId}`
-                );
-
-                return {
-                    ...appt.toObject(),
-                    patient: patientRes.data,
-                    doctor: doctorRes.data
-                };
-            })
-        );
-
-        return res.status(200).json({ appointments: enrichedAppointments });
+        return res.status(200).json({ appointments });
 
     } catch (error) {
         console.log(error);
@@ -110,37 +89,45 @@ const getAppointmentsByDoctorId = async (req, res) => {
 
 //create appointment
 const createappointment = async (req, res) => {
-    const {
-        patientId,
-        doctorId,
-        patientName,
-        doctorName,
-        specialization,
-        date,
-        time,
-        notes,
-    } = req.body;
-    let appointment;
-    try {
-        appointment = new Appointment({
-            patientId,
-            doctorId,
-            patientName,
-            doctorName,
-            specialization,
-            date,
-            time,
-            notes,
-        });
-        await appointment.save();
-    }
-    catch (error) {
-        console.log(error);
-    }   
-    if (!appointment) {
-        return res.status(500).json({ message: "Unable to create appointment" });
-    }   
-    return res.status(201).json({ appointment });
+
+const {
+patientId,
+doctorId,
+patientName,
+patientEmail,
+doctorName,
+specialization,
+date,
+time,
+notes
+} = req.body;
+
+try {
+
+const appointment = await Appointment.create({
+patientId,
+doctorId,
+patientName,
+patientEmail,
+doctorName,
+specialization,
+date,
+time,
+notes
+});
+
+await axios.post("http://localhost:3005/notifications/create", {
+patientId,
+appointmentId: appointment._id,
+type: "APPOINTMENT",
+message: `Appointment booked with Dr.${doctorName} on ${date} at ${time}`
+});
+
+res.status(201).json({ appointment });
+
+} catch (error) {
+res.status(500).json({ error: error.message });
+}
 };
 
 //Get appointment by id
@@ -162,41 +149,46 @@ const getappointmentbyid = async (req, res) => {
 
 //update appointment
 const updateappointment = async (req, res) => {
-    const id = req.params.id;
-    const {
-        patientId,
-        doctorId,
-        patientName,
-        doctorName,
-        specialization,
-        date,
-        time,
-        status,
-        paymentStatus,
-        notes,
-    } = req.body;
-    let appointment;
-    try {
-        appointment = await Appointment.findByIdAndUpdate(id, { 
-            patientId,
-            doctorId,
-            patientName,
-            doctorName,
-            specialization,
-            date,
-            time,
-            status,
-            paymentStatus,
-            notes,
-        }, { new: true });
-    }   
-    catch (error) {
-        console.log(error);
-    }   
+  const id = req.params.id;
+
+  try {
+    const updateData = {};
+
+    const allowedFields = [
+      "patientId",
+      "doctorId",
+      "patientName",
+      "patientEmail",
+      "doctorName",
+      "specialization",
+      "date",
+      "time",
+      "status",
+      "paymentStatus",
+      "notes",
+    ];
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    const appointment = await Appointment.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    );
+
     if (!appointment) {
-        return res.status(404).json({ message: "Unable to update appointment" });
+      return res.status(404).json({ message: "Unable to update appointment" });
     }
+
     return res.status(200).json({ appointment });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: error.message });
+  }
 };
 
 //delete appointment
