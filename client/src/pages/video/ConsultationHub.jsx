@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-import { getOrCreateSessionByAppointment, joinSession } from '../../services/videoApi';
+import { getOrCreateSessionByAppointment, joinSession, deleteSessionByAppointment } from '../../services/videoApi';
 import { useAuth } from '../../context/AuthContext';
 import PatientLayout from '../patient/Patientlayout '; // Using existing layout for consistency
 import { toast, Toaster } from 'react-hot-toast';
@@ -13,6 +13,7 @@ export default function ConsultationHub() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [joiningId, setJoiningId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchApprovedAppointments();
@@ -71,6 +72,29 @@ export default function ConsultationHub() {
     }
   };
 
+  const handleDeleteSession = async (appointmentId) => {
+    if (!window.confirm('Delete this consultation session? You can create it again later by joining.')) {
+      return;
+    }
+    try {
+      setDeletingId(appointmentId);
+      await deleteSessionByAppointment(appointmentId);
+      setAppointments((prev) => prev.filter((appt) => appt._id !== appointmentId));
+      toast.success('Consultation removed from your list');
+    } catch (err) {
+      console.error('Delete session error:', err);
+      // Backward compatibility if server still returns 404 for missing session.
+      if (err.response?.status === 404) {
+        setAppointments((prev) => prev.filter((appt) => appt._id !== appointmentId));
+        toast.success('No active session found; removed from your list');
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to delete consultation session.');
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <PatientLayout title="Consultation Hub" subtitle="Enter your digital clinic rooms">
       <Toaster position="top-center" />
@@ -118,11 +142,20 @@ export default function ConsultationHub() {
               <div className="hub-footer">
                 <button
                   onClick={() => handleJoinCall(appt._id)}
-                  disabled={joiningId === appt._id}
+                  disabled={joiningId === appt._id || deletingId === appt._id}
                   className={`hub-join-btn ${joiningId === appt._id ? 'loading' : ''}`}
                 >
                   {joiningId === appt._id ? 'Preparing Room...' : 'Join Consultation'}
                 </button>
+                {user?.role === 'patient' && (
+                  <button
+                    onClick={() => handleDeleteSession(appt._id)}
+                    disabled={deletingId === appt._id || joiningId === appt._id}
+                    className="hub-delete-btn"
+                  >
+                    {deletingId === appt._id ? 'Deleting...' : 'Delete Session'}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -205,6 +238,9 @@ const hubStyles = `
 
   .hub-footer {
     margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .hub-join-btn {
@@ -224,6 +260,27 @@ const hubStyles = `
   }
 
   .hub-join-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .hub-delete-btn {
+    width: 100%;
+    padding: 11px;
+    border-radius: 10px;
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #be123c;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .hub-delete-btn:hover:not(:disabled) {
+    background: #ffe4e6;
+  }
+
+  .hub-delete-btn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
   }

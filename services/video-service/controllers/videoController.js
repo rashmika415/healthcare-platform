@@ -330,6 +330,47 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
 };
 
 /**
+ * Participant action: delete an active session by appointment
+ * (patient/doctor who belongs to the session).
+ */
+exports.deleteSessionByAppointment = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    if (!appointmentId) {
+      return res.status(400).json({ error: 'appointmentId is required' });
+    }
+
+    const session = await VideoSession.findOne({ appointmentId });
+    if (!session) {
+      // Keep delete idempotent: if no active session exists, treat as successful.
+      return res.status(200).json({
+        message: 'No active consultation session found',
+        deleted: false
+      });
+    }
+
+    const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
+    const isParticipant =
+      String(requesterId) === String(session.patientUserId) ||
+      String(requesterId) === String(session.doctorUserId) ||
+      (doctorProfileId && String(doctorProfileId) === String(session.doctorUserId));
+
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'You are not authorized to delete this consultation session' });
+    }
+
+    await VideoSession.deleteOne({ _id: session._id });
+    return res.status(200).json({
+      message: 'Consultation session deleted successfully',
+      deleted: true
+    });
+  } catch (error) {
+    console.error('Error in deleteSessionByAppointment:', error);
+    return res.status(500).json({ error: 'Internal server error while deleting session' });
+  }
+};
+
+/**
  * Admin: Get all active sessions
  */
 exports.adminGetAllSessions = async (req, res) => {
