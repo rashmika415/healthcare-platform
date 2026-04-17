@@ -66,7 +66,8 @@ router.post('/register', async (req, res) => {
         id:   newUser._id,
         name: newUser.name,
         email: newUser.email,
-        role:  newUser.role
+        role:  newUser.role,
+        isVerified: newUser.isVerified
       }
     });
 
@@ -128,7 +129,8 @@ router.post('/login', async (req, res) => {
         id:    user._id,
         name:  user.name,
         email: user.email,
-        role:  user.role
+        role:  user.role,
+        isVerified: user.isVerified
       }
     });
 
@@ -154,13 +156,37 @@ router.get('/me', (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    res.json({
-      user: {
-        id:    decoded.id,
-        name:  decoded.name,
-        email: decoded.email,
-        role:  decoded.role
-      }
+    // Source of truth is DB (admin may verify after token was issued)
+    // Keep this endpoint safe: it only returns fields for the current user.
+    // Note: decoded.id is set at token creation time.
+    //
+    // (If DB lookup fails, default to false.)
+    // eslint-disable-next-line no-unused-vars
+    const _id = String(decoded.id);
+    // Since this route is sync-ish today, use a small async wrapper.
+    // (Keeping minimal changes to existing structure.)
+    // We cannot mark this handler async without changing the signature; instead,
+    // we do a blocking-style promise chain and return inside.
+    return User.findById(_id).select('isVerified').then((dbUser) => {
+      res.json({
+        user: {
+          id:    decoded.id,
+          name:  decoded.name,
+          email: decoded.email,
+          role:  decoded.role,
+          isVerified: dbUser && dbUser.isVerified ? true : false
+        }
+      });
+    }).catch(() => {
+      res.json({
+        user: {
+          id:    decoded.id,
+          name:  decoded.name,
+          email: decoded.email,
+          role:  decoded.role,
+          isVerified: false
+        }
+      });
     });
 
   } catch (err) {

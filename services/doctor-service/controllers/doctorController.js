@@ -34,6 +34,12 @@ exports.upsertProfile = async (req, res) => {
       bio,
       consultationFee: Number(consultationFee),
     };
+    // Keep doctor-service verification in sync with authdb (gateway header).
+    // Important: never overwrite an already-verified doctor back to false.
+    if (req.user.isVerified === true) {
+      profileData.isVerified = true;
+      profileData.verifiedAt = profileData.verifiedAt || new Date();
+    }
 
     const isNew = !(await Doctor.findOne({ userId: req.user.id }));
 
@@ -83,10 +89,19 @@ exports.getProfile = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized: no user info' });
     }
 
-    const doctor = await Doctor.findOne({ userId: req.user.id });
+    let doctor = await Doctor.findOne({ userId: req.user.id });
 
     if (!doctor) {
       return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    // Self-heal: if authdb says verified but doctor profile isn't, sync it.
+    if (req.user.isVerified === true && doctor.isVerified !== true) {
+      doctor = await Doctor.findOneAndUpdate(
+        { userId: req.user.id },
+        { $set: { isVerified: true, verifiedAt: doctor.verifiedAt || new Date() } },
+        { new: true }
+      );
     }
 
     res.status(200).json(doctor);
@@ -235,6 +250,42 @@ exports.verifyDoctorByUserId = async (req, res) => {
 
     // Avoid duplicate emails/notifications if admin clicks verify twice.
     if (existingDoctor.isVerified) {
+      // If the profile was already marked verified (e.g. synced from authdb),
+      // we may still need to send the verification email once.
+      if (!existingDoctor.verificationEmailSent) {
+        try {
+          await Notification.create({
+            message: `Doctor verified: ${existingDoctor.name}`,
+            type: "doctor_verified"
+          });
+
+          await sendEmail({
+            to: existingDoctor.email,
+            subject: "Account Verified ✅",
+            text: `Hello Dr. ${existingDoctor.name}, your account has been successfully verified by the admin team.`
+          });
+
+          const updated = await Doctor.findOneAndUpdate(
+            { userId },
+            {
+              $set: {
+                verificationEmailSent: true,
+                verifiedAt: existingDoctor.verifiedAt || new Date(),
+                verifiedBy: existingDoctor.verifiedBy || req.user.id
+              }
+            },
+            { new: true }
+          );
+
+          return res.status(200).json({
+            message: 'Doctor already verified (verification email sent)',
+            doctor: updated
+          });
+        } catch (e) {
+          console.error("Verification email/notification error (already verified):", e.message);
+          // fall through to standard response
+        }
+      }
       return res.status(200).json({
         message: 'Doctor already verified',
         doctor: existingDoctor
