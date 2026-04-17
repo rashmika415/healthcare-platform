@@ -16,7 +16,7 @@ async function test() {
       'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify({
-      appointmentId: 'appt999',
+      appointmentId: 'appt-final-test-' + Date.now(),
       patientUserId: 'pat123',
       doctorUserId: 'doc123'
     })

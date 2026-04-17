@@ -20,13 +20,37 @@ export default function PatientAppointments() {
   const [error,        setError]        = useState('');
   const [joiningId,    setJoiningId]    = useState(null);
 
+  const getStoredUser = () => {
+    try {
+      const p = localStorage.getItem('authPersistence');
+      if (p === 'local') return JSON.parse(localStorage.getItem('user')) || {};
+      return (
+        JSON.parse(sessionStorage.getItem('user')) ||
+        JSON.parse(localStorage.getItem('user')) ||
+        {}
+      );
+    } catch {
+      return {};
+    }
+  };
+
   useEffect(() => {
-    // This will call appointment service once Member 3 builds it
-    // For now shows empty state
-    api.get('/appointments/patient')
-      .then(r  => setAppointments(r.data || []))
+    const user = getStoredUser();
+    const patientId = String(user?.id || user?._id || user?.userId || '').trim();
+    if (!patientId) {
+      setAppointments([]);
+      setLoading(false);
+      return;
+    }
+
+    api.get(`/appointments/patient/${encodeURIComponent(patientId)}`)
+      .then(r => {
+        const list = Array.isArray(r.data?.appointments)
+          ? r.data.appointments
+          : (Array.isArray(r.data) ? r.data : []);
+        setAppointments(list);
+      })
       .catch(() => {
-        // Appointment service may not be running yet — show empty state
         setAppointments([]);
       })
       .finally(() => setLoading(false));
@@ -55,7 +79,7 @@ export default function PatientAppointments() {
   const handleCancel = async (id) => {
     if (!window.confirm('Cancel this appointment?')) return;
     try {
-      await api.delete(`/appointments/${id}`);
+      await api.delete(`/appointments/deleteappointment/${id}`);
       setAppointments(a => a.filter(ap => ap._id !== id));
     } catch {
       setError('Failed to cancel appointment');

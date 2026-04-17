@@ -306,19 +306,30 @@ export default function DoctorDashboard() {
   };
 
   const handleJoinCall = async (appointmentId) => {
+    // Open the window immediately to bypass popup blockers
+    const meetingWindow = window.open('about:blank', '_blank');
+    if (meetingWindow) {
+      meetingWindow.document.write('<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666;background:#f8fafc;"><div><h2 style="margin-bottom:8px;color:#1e293b;">Entering Consultation...</h2><p>Please wait while we prepare your secure room.</p></div></body></html>');
+    }
+
     try {
       setJoiningId(appointmentId);
       const sessionData = await getOrCreateSessionByAppointment(appointmentId);
       const joinData = await joinSession(sessionData.session.sessionId, sessionData.join.participantToken);
 
       if (joinData.meeting?.url) {
-        window.open(joinData.meeting.url, "_blank");
+        if (meetingWindow) {
+          meetingWindow.location.href = joinData.meeting.url;
+        } else {
+          window.open(joinData.meeting.url, "_blank");
+        }
         toast.success("Consultation room opened!");
       } else {
         throw new Error("No meeting URL received");
       }
     } catch (err) {
       console.error("Video join error:", err);
+      if (meetingWindow) meetingWindow.close();
       toast.error(err.response?.data?.error || "Failed to enter consultation.");
     } finally {
       setJoiningId(null);
@@ -510,19 +521,21 @@ export default function DoctorDashboard() {
                   </button>
                   <button 
                     onClick={() => selected?._id && handleJoinCall(selected._id)}
-                    disabled={!selected || joiningId === selected._id || String(selected.paymentStatus || '').toLowerCase() === 'completed'}
+                    disabled={!selected || joiningId === selected._id || selected.status !== 'accepted' || String(selected.paymentStatus || '').toLowerCase() !== 'completed'}
                     className={`bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-semibold py-2.5 rounded-xl hover:opacity-90 transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 
-                      ${(!selected || joiningId === selected._id || String(selected.paymentStatus || '').toLowerCase() === 'completed') ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      ${(!selected || joiningId === selected._id || selected.status !== 'accepted' || String(selected.paymentStatus || '').toLowerCase() !== 'completed') ? 'opacity-70 cursor-not-allowed grayscale' : ''}`}
                   >
                     {joiningId === (selected?._id) ? (
                       <>
                         <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                         Joining...
                       </>
-                    ) : (selected && String(selected.paymentStatus || '').toLowerCase() === 'completed') ? (
-                      "Consultation Finished"
+                    ) : (selected && String(selected.paymentStatus || '').toLowerCase() !== 'completed') ? (
+                      "Payment Pending"
+                    ) : (selected && selected.status !== 'accepted') ? (
+                      "Accept to Join"
                     ) : (
-                      "Chat"
+                      "Join Meeting"
                     )}
                   </button>
                 </div>
