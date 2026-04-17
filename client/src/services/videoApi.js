@@ -33,6 +33,14 @@ export const joinSession = async (sessionId, participantToken) => {
 };
 
 /**
+ * Participant: Delete consultation session for an appointment
+ */
+export const deleteSessionByAppointment = async (appointmentId) => {
+  const response = await videoApi.delete(`/appointment/${appointmentId}`);
+  return response.data;
+};
+
+/**
  * Admin: Get all active sessions
  */
 export const adminGetAllSessions = async () => {

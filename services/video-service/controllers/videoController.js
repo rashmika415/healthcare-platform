@@ -1,12 +1,15 @@
 const crypto = require('crypto');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const VideoSession = require('../models/VideoSession');
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
 function buildRoomName(appointmentId) {
+  // Deterministic room name based strictly on appointment ID to ensure all parties join the same meeting
   const safeAppointment = String(appointmentId).replace(/[^a-zA-Z0-9_-]/g, '');
-  return `healthcare-consult-${safeAppointment}-${crypto.randomBytes(4).toString('hex')}`;
+  return `healthcare-consult-${safeAppointment}`;
 }
 
 function canCreateSession(role) {
@@ -22,26 +25,28 @@ async function resolveRequesterIds(req) {
 
   if (role === 'doctor') {
     try {
+      // Use local DNS or localhost for inter-service communication
       const DOCTOR_SERVICE_URL = process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002';
-      // Forward gateway headers to authenticate with doctor-service
+      
       const resp = await axios.get(`${DOCTOR_SERVICE_URL}/profile`, {
         headers: {
           'x-user-id': req.headers['x-user-id'] || requesterId,
           'x-user-role': req.headers['x-user-role'] || 'doctor',
-          'x-user-email': req.headers['x-user-email'],
-          'x-user-name': req.headers['x-user-name'],
           'Authorization': req.headers['authorization']
-        }
+        },
+        timeout: 2000 // Fast fail for inter-service calls
       });
-      activeDoctorProfileId = resp.data?._id;
+
+      const doctorData = resp.data?.doctor || resp.data;
+      activeDoctorProfileId = doctorData?._id ? String(doctorData._id) : null;
     } catch (err) {
-      console.error('resolveRequesterIds: Failed to fetch doctor profile:', err.message);
+      console.warn(`[Video] resolveRequesterIds: Could not resolve doctor profile (${err.message}). Falling back to Auth ID.`);
     }
   }
 
   return {
-    userId: requesterId,
-    doctorProfileId: activeDoctorProfileId
+    userId: String(requesterId || '').trim(),
+    doctorProfileId: activeDoctorProfileId ? String(activeDoctorProfileId).trim() : null
   };
 }
 
@@ -127,16 +132,19 @@ exports.joinSession = async (req, res) => {
     }
 
     const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
+    
+    // Check both Auth User ID AND Profile ID to ensure universal matching
     const isParticipant =
-      requesterId === session.patientUserId || 
-      requesterId === session.doctorUserId ||
-      (doctorProfileId && doctorProfileId === session.doctorUserId);
+      String(requesterId) === String(session.patientUserId) || 
+      String(requesterId) === String(session.doctorUserId) ||
+      (doctorProfileId && String(doctorProfileId) === String(session.doctorUserId));
 
     if (!isParticipant) {
+      console.warn(`[Video] Unauthorized join attempt for session ${sessionId} by user ${requesterId}`);
       return res.status(403).json({ error: 'You are not part of this consultation session' });
     }
 
-    if (participantToken !== session.participantToken) {
+    if (String(participantToken).trim() !== String(session.participantToken).trim()) {
       return res.status(403).json({ error: 'Invalid participant token' });
     }
 
@@ -220,10 +228,11 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
     if (session) {
       // Verify authorization: Is the requester part of this session?
       const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
+      
       const isParticipant = 
-        requesterId === session.patientUserId || 
-        requesterId === session.doctorUserId ||
-        (doctorProfileId && doctorProfileId === session.doctorUserId);
+        String(requesterId) === String(session.patientUserId) || 
+        String(requesterId) === String(session.doctorUserId) ||
+        (doctorProfileId && String(doctorProfileId) === String(session.doctorUserId));
 
       if (!isParticipant) {
         return res.status(403).json({ error: 'You are not authorized for this consultation' });
@@ -261,8 +270,10 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
     }
 
     // 3. Verify status (Approved in this system is "BOOKED" or "accepted")
-    const validStatuses = ['BOOKED', 'accepted', 'confirmed'];
-    if (!validStatuses.includes(appointment.status)) {
+    const validStatuses = ['booked', 'accepted', 'confirmed'];
+    const currentStatus = String(appointment.status || '').toLowerCase().trim();
+    if (!validStatuses.includes(currentStatus)) {
+      console.warn(`[Video] getOrCreateSessionByAppointment: Invalid status '${appointment.status}' for appointment ${appointmentId}`);
       return res.status(400).json({ 
         error: `Session cannot be created. Appointment status is '${appointment.status}'. Must be one of: ${validStatuses.join(', ')}.` 
       });
@@ -270,8 +281,11 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
 
     // 4. Verify authorization: Is the requester the doctor or patient of this appointment?
     const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
-    const isDoctor = requesterId === appointment.doctorId || (doctorProfileId && doctorProfileId === appointment.doctorId);
-    const isPatient = requesterId === appointment.patientId;
+    const docIdInAppt = String(appointment.doctorId);
+    const patIdInAppt = String(appointment.patientId);
+
+    const isDoctor = String(requesterId) === docIdInAppt || (doctorProfileId && String(doctorProfileId) === docIdInAppt);
+    const isPatient = String(requesterId) === patIdInAppt;
     
     if (!isDoctor && !isPatient) {
       return res.status(403).json({ error: 'You are not a participant in this appointment' });
@@ -312,6 +326,47 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
   } catch (error) {
     console.error('Error in getOrCreateSessionByAppointment:', error);
     return res.status(500).json({ error: 'Internal server error while handling appointment session' });
+  }
+};
+
+/**
+ * Participant action: delete an active session by appointment
+ * (patient/doctor who belongs to the session).
+ */
+exports.deleteSessionByAppointment = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    if (!appointmentId) {
+      return res.status(400).json({ error: 'appointmentId is required' });
+    }
+
+    const session = await VideoSession.findOne({ appointmentId });
+    if (!session) {
+      // Keep delete idempotent: if no active session exists, treat as successful.
+      return res.status(200).json({
+        message: 'No active consultation session found',
+        deleted: false
+      });
+    }
+
+    const { userId: requesterId, doctorProfileId } = await resolveRequesterIds(req);
+    const isParticipant =
+      String(requesterId) === String(session.patientUserId) ||
+      String(requesterId) === String(session.doctorUserId) ||
+      (doctorProfileId && String(doctorProfileId) === String(session.doctorUserId));
+
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'You are not authorized to delete this consultation session' });
+    }
+
+    await VideoSession.deleteOne({ _id: session._id });
+    return res.status(200).json({
+      message: 'Consultation session deleted successfully',
+      deleted: true
+    });
+  } catch (error) {
+    console.error('Error in deleteSessionByAppointment:', error);
+    return res.status(500).json({ error: 'Internal server error while deleting session' });
   }
 };
 
