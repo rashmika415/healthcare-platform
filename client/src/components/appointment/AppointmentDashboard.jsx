@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import PatientLayout from "../../pages/patient/Patientlayout ";
+import { useNavigate } from "react-router-dom";
 
 /** Strip trailing slash and accidental `/appointments` so env can be service root or full prefix */
 function normalizeAppointmentBaseUrl(raw) {
@@ -84,6 +85,7 @@ function getStatusBadge(status) {
 
 function AppointmentDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -263,6 +265,12 @@ function AppointmentDashboard() {
     alert("Failed to cancel appointment");
   };
 
+  const handleGoToPayment = (appointmentId) => {
+    navigate("/payment", {
+      state: { appointmentId },
+    });
+  };
+
   return (
     <PatientLayout title="Appointments" subtitle="View all your medical appointments">
       <div className="flex flex-col gap-6">
@@ -415,14 +423,25 @@ function AppointmentDashboard() {
                         </div>
 
                         <div className="mt-4">
-                          {appointment.status !== "CANCELLED" && (
-                            <button
-                              onClick={() => handleCancelAppointment(appointment._id)}
-                              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition"
-                            >
-                              Cancel
-                            </button>
-                          )}
+                          <div className="flex flex-wrap items-center gap-3">
+                            {String(appointment.paymentStatus || "").toUpperCase() === "PENDING" &&
+                              appointment.status !== "CANCELLED" && (
+                                <button
+                                  onClick={() => handleGoToPayment(appointment._id)}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                                >
+                                  Payment
+                                </button>
+                              )}
+                            {appointment.status !== "CANCELLED" && (
+                              <button
+                                onClick={() => handleCancelAppointment(appointment._id)}
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
