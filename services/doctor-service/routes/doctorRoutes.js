@@ -33,6 +33,9 @@ router.patch('/verify/:doctorId', authMiddleware, doctorController.verifyDoctor)
 // API gateway verifies users by User._id, but doctor profile uses Doctor.userId.
 router.patch('/verify-by-user/:userId', authMiddleware, doctorController.verifyDoctorByUserId);
 
+// ❌ REJECT DOCTOR PROFILE BY USER ID (ADMIN)
+router.patch('/reject-by-user/:userId', authMiddleware, doctorController.rejectDoctorByUserId);
+
 
 // ✅ GET UNVERIFIED DOCTORS (ADMIN)
 router.get('/unverified', authMiddleware, doctorController.getUnverifiedDoctors);

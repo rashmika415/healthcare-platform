@@ -297,6 +297,8 @@ exports.verifyDoctorByUserId = async (req, res) => {
       {
         $set: {
           isVerified: true,
+          verificationStatus: 'verified',
+          verificationRejectedReason: null,
           verifiedAt: new Date(),
           verifiedBy: req.user.id,
           verificationEmailSent: true
@@ -328,6 +330,96 @@ exports.verifyDoctorByUserId = async (req, res) => {
   } catch (err) {
     console.error('Error in verifyDoctorByUserId:', err);
     res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * ❌ Reject Doctor Profile by UserId (ADMIN ONLY)
+ * PATCH /doctor/reject-by-user/:userId
+ * Body: { reason }
+ */
+exports.rejectDoctorByUserId = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Unauthorized: no user info' });
+    }
+
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admin allowed' });
+    }
+
+    const { userId } = req.params;
+    const reason = (req.body?.reason || '').toString().trim() || 'Rejected by admin';
+
+    const existingDoctor = await Doctor.findOne({ userId });
+    if (!existingDoctor) {
+      // Best-effort: email doctor even if profile hasn't been created yet.
+      const doctorEmail = req.headers['x-doctor-email'];
+      const doctorName = req.headers['x-doctor-name'] || 'Doctor';
+
+      if (doctorEmail) {
+        try {
+          await Notification.create({
+            message: `Doctor rejected: ${doctorName}`,
+            type: "doctor_rejected"
+          });
+
+          await sendEmail({
+            to: doctorEmail,
+            subject: "Registration Rejected",
+            text: `Hello Dr. ${doctorName}, unfortunately your registration was rejected by the admin team. Reason: ${reason}`
+          });
+        } catch (e) {
+          console.error("Rejection email/notification error (fallback):", e.message);
+        }
+
+        return res.status(200).json({
+          message: 'Doctor rejected (email sent, doctor profile not found)',
+          doctor: null
+        });
+      }
+
+      return res.status(404).json({ error: 'Doctor profile not found' });
+    }
+
+    const doctor = await Doctor.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          isVerified: false,
+          verificationStatus: 'rejected',
+          verificationRejectedReason: reason,
+          verifiedAt: null,
+          verifiedBy: req.user.id,
+          verificationEmailSent: true
+        }
+      },
+      { new: true }
+    );
+
+    // 🔔 Notification + 📧 Email (best-effort)
+    try {
+      await Notification.create({
+        message: `Doctor rejected: ${doctor.name}`,
+        type: "doctor_rejected"
+      });
+
+      await sendEmail({
+        to: doctor.email,
+        subject: "Registration Rejected",
+        text: `Hello Dr. ${doctor.name}, unfortunately your registration was rejected by the admin team. Reason: ${reason}`
+      });
+    } catch (e) {
+      console.error("Rejection email/notification error:", e.message);
+    }
+
+    return res.status(200).json({
+      message: 'Doctor rejected',
+      doctor
+    });
+  } catch (err) {
+    console.error('Error in rejectDoctorByUserId:', err);
+    return res.status(500).json({ error: err.message });
   }
 };
 

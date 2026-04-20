@@ -25,7 +25,11 @@ const createAdmin = async () => {
       email: 'admin@healthcare.com',
       password: hashed,
       role: 'admin',
-      isVerified: true
+      isActive: true,
+      isVerified: true,
+      verificationStatus: 'verified',
+      verificationDecidedAt: new Date(),
+      verificationDecidedBy: 'seed'
     });
 
     console.log('✅ Admin created successfully');

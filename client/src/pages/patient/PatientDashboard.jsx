@@ -82,7 +82,8 @@ export default function PatientDashboard() {
   const quickActions = [
     { label: 'Upload Report', path: '/patient/reports' },
     { label: 'View Prescriptions', path: '/patient/prescriptions' },
-    { label: 'Book Appointment', path: '/patient/appointments' }
+    { label: 'Book Appointment', path: '/patient/appointments' },
+    { label: 'AI Symptom Checker', path: '/patient/symptom-checker' }
   ];
 
   const filteredActions = quickActions.filter((action) =>
@@ -97,6 +98,7 @@ export default function PatientDashboard() {
     else if (term.includes('report') || term.includes('record')) navigate('/patient/reports');
     else if (term.includes('prescription') || term.includes('message') || term.includes('medicine')) navigate('/patient/prescriptions');
     else if (term.includes('history') || term.includes('consult')) navigate('/patient/history');
+    else if (term.includes('symptom') || term.includes('checker') || term.includes('ai')) navigate('/patient/symptom-checker');
     else if (term.includes('profile')) navigate('/patient/profile');
   };
 

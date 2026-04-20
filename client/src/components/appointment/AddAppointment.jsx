@@ -88,6 +88,7 @@ function AddAppointment() {
       specialization,
       appointmentDate,
       appointmentTime,
+      notes,
     } = location.state;
 
     setFormData((prev) => ({
@@ -97,6 +98,9 @@ function AddAppointment() {
       specialization: specialization || prev.specialization,
       date: toInputDate(appointmentDate) || prev.date,
       time: toInputTime(appointmentTime) || prev.time,
+      notes: (notes !== undefined && notes !== null && String(notes).trim())
+        ? String(notes).trim()
+        : prev.notes,
     }));
   }, [location.state]);
 

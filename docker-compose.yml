@@ -28,6 +28,8 @@ services:
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
       PAYMENT_SERVICE_URL: http://payment-service:3004
       VIDEO_SERVICE_URL: http://video-service:3006
+      AI_SYMPTOM_SERVICE_URL: http://ai-symptom-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:3005
     depends_on:
       mongo:
         condition: service_healthy
@@ -40,6 +42,8 @@ services:
       payment-service:
         condition: service_healthy
       video-service:
+        condition: service_healthy
+      ai-symptom-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
@@ -105,6 +109,7 @@ services:
       PORT: 3003
       MONGO_URI: mongodb://mongo:27017/appointmentdb
       DOCTOR_SERVICE_URL: http://doctor-service:3002
+      NOTIFICATION_SERVICE_URL: http://notification-service:3005
     depends_on:
       mongo:
         condition: service_healthy
@@ -129,6 +134,7 @@ services:
       STRIPE_SECRET_KEY: change-me-stripe-secret
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
       DOCTOR_SERVICE_URL: http://doctor-service:3002
+      NOTIFICATION_SERVICE_URL: http://notification-service:3005
     depends_on:
       mongo:
         condition: service_healthy
@@ -163,11 +169,54 @@ services:
       retries: 10
       start_period: 25s
 
+  ai-symptom-service:
+    build:
+      context: ./services/ai-symptom-service
+    container_name: ai-symptom-service
+    ports:
+      - "3107:3007"
+    environment:
+      PORT: 3007
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3007/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: notification-service
+    ports:
+      - "3105:3005"
+    environment:
+      PORT: 3005
+      MONGO_URI: mongodb://mongo:27017/notificationdb
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3003
+      EMAIL_USER: change-me-email-user
+      EMAIL_PASS: change-me-email-pass
+      EMAIL_FROM: no-reply@example.com
+    depends_on:
+      mongo:
+        condition: service_healthy
+      appointment-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3005/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
   client:
     build:
       context: ./client
       args:
         REACT_APP_API_BASE_URL: http://localhost:3100
+        REACT_APP_NOTIFICATION_URL: http://localhost:3105
     container_name: healthcare-client
     ports:
       - "8082:80"

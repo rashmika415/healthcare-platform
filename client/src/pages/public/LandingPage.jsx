@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import PublicNavbar from "../../components/PublicNavbar";
 
 const doctorAvatars = [
   'https://i.pravatar.cc/80?img=12',
@@ -14,36 +15,8 @@ const trustMetrics = [
   { value: '24/7', label: 'Virtual triage support' }
 ];
 
-const navLinks = [
-  { label: 'Home', href: '/' },
-  { label: 'Appointments', href: '/appointments' },
-  { label: 'Telemedicine', href: '/#telemedicine' },
-  { label: 'Contact', href: '/#messages' },
-  { label: 'Health Records', href: '/#records' }
-];
-
 const NexusHealth = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user } = useAuth();
-
-  const getLink = (link) => {
-    if (link.label === 'Home') return '/';
-    if (link.label === 'Appointments' && user) {
-      if (user.role === 'patient') return '/appointments';
-      if (user.role === 'doctor') return '/doctor/appointments';
-      if (user.role === 'admin') return '/admin/dashboard';
-    }
-    return link.href;
-  };
-
-  const getProfilePathByRole = (role) => {
-    if (role === 'patient') return '/patient/profile';
-    if (role === 'doctor') return '/doctor/dashboard';
-    if (role === 'admin') return '/admin/dashboard';
-    return '/';
-  };
-
-  const profilePath = getProfilePathByRole(user?.role);
 
   useEffect(() => {
     const revealItems = document.querySelectorAll('.reveal');
@@ -71,133 +44,7 @@ const NexusHealth = () => {
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-slate-50 text-on-surface font-body selection:bg-primary-fixed selection:text-primary">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_15%_20%,rgba(147,197,253,0.35),transparent_38%),radial-gradient(circle_at_88%_14%,rgba(30,64,175,0.2),transparent_30%)]"></div>
-      {/* TopNavBar */}
-      <nav className="fixed top-0 w-full z-50 bg-white/75 backdrop-blur-xl border-b border-blue-900/10 shadow-[0_10px_40px_-20px_rgba(0,24,54,0.25)] font-inter tracking-tight antialiased">
-        <div className="flex justify-between items-center h-20 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto">
-          <div className="text-2xl font-headline font-bold tracking-tighter text-blue-950">Nexus Health</div>
-          <div className="hidden md:flex items-center gap-10">
-            {navLinks.filter(link => !link.authRequired || user).map((link, index) => {
-              const targetUrl = getLink(link);
-              const isRoute = targetUrl.startsWith('/');
-
-              return isRoute ? (
-                <Link
-                  key={link.label}
-                  className={index === 0 ? 'text-blue-900 border-b-2 border-blue-900 pb-1' : 'text-slate-500 hover:text-blue-900 transition-colors'}
-                  to={targetUrl}
-                >
-                  {link.label}
-                </Link>
-              ) : (
-                <a
-                  key={link.label}
-                  className={index === 0 ? 'text-blue-900 border-b-2 border-blue-900 pb-1' : 'text-slate-500 hover:text-blue-900 transition-colors'}
-                  href={targetUrl}
-                >
-                  {link.label}
-                </a>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-3 sm:gap-5">
-            <button className="hidden sm:inline-flex text-slate-500 hover:text-blue-900 transition-all duration-200 ease-out">
-              <span className="material-symbols-outlined">search</span>
-            </button>
-            <button
-              className="inline-flex md:hidden text-slate-600 hover:text-blue-900 transition-colors"
-              aria-label="Toggle navigation menu"
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-            >
-              <span className="material-symbols-outlined">{isMenuOpen ? 'close' : 'menu'}</span>
-            </button>
-            {!user && (
-              <>
-                <Link
-                  to="/login"
-                  className="hidden sm:inline-flex px-4 py-2.5 rounded-md text-sm font-semibold text-blue-900 hover:text-blue-700 transition-colors"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  className="bg-[#001836] text-white px-4 sm:px-5 py-2.5 rounded-md font-semibold text-sm shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-transform bg-gradient-to-br from-[#001836] to-[#002d5b]"
-                >
-                  Register
-                </Link>
-              </>
-            )}
-            {user && (
-              <Link
-                to={profilePath}
-                className="hidden sm:block w-10 h-10 rounded-full bg-surface-container overflow-hidden ring-2 ring-white/70"
-                aria-label="Open profile"
-                title="Profile"
-              >
-                <img
-                  alt="User profile"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwsl_3uu5TZFBhkTbZ3nBB39Cr406ThQ6xobI6b9Ft6dZrvizZJYsKIXgfylO8437ILfeFPabf4n_R0mmXNBEjhP-VZiJ2gCqnjhsG91UDpGJi9T5r7E9YxYEMmcOHGPvCzD2VT2QvZzO1_9Z4XNTtKovdY9WeXkJbdjlZlfegXccW2ySc_cfAZLezq-wzimMBTZ3vkxXsqgP25i_ZhhsQmoRU9agrxykFX_9ZdzoPyKAGUe_RSImrTu0xMl9VBgOFtcOdi2uAYcM"
-                  className="w-full h-full object-cover"
-                />
-              </Link>
-            )}
-          </div>
-        </div>
-        <div className={`md:hidden px-4 sm:px-6 pb-4 transition-all duration-300 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
-          <div className="rounded-2xl border border-blue-100 bg-white/95 shadow-lg p-4 space-y-3">
-            {navLinks.filter(link => !link.authRequired || user).map((link) => {
-              const targetUrl = getLink(link);
-              const isRoute = targetUrl.startsWith('/');
-
-              return isRoute ? (
-                <Link
-                  key={link.label}
-                  to={targetUrl}
-                  onClick={() => setIsMenuOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
-                >
-                  {link.label}
-                </Link>
-              ) : (
-                <a
-                  key={link.label}
-                  href={targetUrl}
-                  onClick={() => setIsMenuOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-blue-50 hover:text-blue-900 transition-colors"
-                >
-                  {link.label}
-                </a>
-              );
-            })}
-            {!user && (
-              <div className="pt-2 flex gap-3">
-                <Link
-                  to="/login"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex-1 text-center rounded-lg px-3 py-2 border border-blue-200 text-blue-900 font-semibold hover:bg-blue-50 transition-colors"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex-1 text-center rounded-lg px-3 py-2 bg-[#001836] text-white font-semibold bg-gradient-to-br from-[#001836] to-[#002d5b]"
-                >
-                  Register
-                </Link>
-              </div>
-            )}
-            {user && (
-              <Link
-                to={profilePath}
-                onClick={() => setIsMenuOpen(false)}
-                className="block rounded-lg px-3 py-2 text-center border border-blue-200 text-blue-900 font-semibold hover:bg-blue-50 transition-colors"
-              >
-                Profile
-              </Link>
-            )}
-          </div>
-        </div>
-      </nav>
+      <PublicNavbar />
 
       <main className="relative pt-20">
         {/* Hero Section */}

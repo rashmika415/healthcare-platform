@@ -116,7 +116,11 @@ time,
 notes
 });
 
-await axios.post("http://localhost:3005/notifications/create", {
+const notificationBaseUrl =
+  (process.env.NOTIFICATION_SERVICE_URL || "").trim().replace(/\/$/, "") ||
+  "http://notification-service:3005";
+
+await axios.post(`${notificationBaseUrl}/notifications/create`, {
 patientId,
 appointmentId: appointment._id,
 type: "APPOINTMENT",
