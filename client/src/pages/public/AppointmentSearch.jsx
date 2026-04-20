@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import PublicNavbar from "../../components/PublicNavbar";
 
 export default function AppointmentSearch() {
   const navigate = useNavigate();
@@ -45,8 +46,9 @@ export default function AppointmentSearch() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <PublicNavbar />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(circle_at_15%_20%,rgba(147,197,253,0.35),transparent_38%),radial-gradient(circle_at_88%_14%,rgba(30,64,175,0.2),transparent_30%)]" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 pb-14">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-24 pb-14">
         <div className="relative flex items-center justify-between gap-4 mb-8">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">

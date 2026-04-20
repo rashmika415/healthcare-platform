@@ -57,6 +57,18 @@ const doctorSchema = new mongoose.Schema(
       default: false,
     },
 
+    verificationStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
+      default: 'pending',
+    },
+
+    verificationRejectedReason: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
     // 🔄 Track verification time
     verifiedAt: {
       type: Date,

@@ -25,6 +25,16 @@ export default function AdminDoctors() {
     } catch { setMsg('Failed to verify doctor'); }
   };
 
+  const handleReject = async (id) => {
+    const reason = window.prompt('Rejection reason (optional):') || '';
+    try {
+      await api.put(`/admin/reject-doctor/${id}`, { reason });
+      setMsg('Doctor rejected.');
+      fetchUsers();
+      setTimeout(() => setMsg(''), 3000);
+    } catch { setMsg('Failed to reject doctor'); }
+  };
+
   const handleDeactivate = async (id) => {
     if (!window.confirm('Deactivate this doctor?')) return;
     try {
@@ -35,9 +45,20 @@ export default function AdminDoctors() {
     } catch { setMsg('Failed to deactivate'); }
   };
 
+  const handleActivate = async (id) => {
+    if (!window.confirm('Activate this doctor?')) return;
+    try {
+      await api.put(`/admin/activate/${id}`);
+      setMsg('Doctor activated.');
+      fetchUsers();
+      setTimeout(() => setMsg(''), 3000);
+    } catch { setMsg('Failed to activate'); }
+  };
+
   const filtered = filter === 'all'     ? users
-    : filter === 'verified'   ? users.filter(u => u.isVerified)
-    : users.filter(u => !u.isVerified);
+    : filter === 'verified'   ? users.filter(u => u.verificationStatus === 'verified')
+    : filter === 'rejected'   ? users.filter(u => u.verificationStatus === 'rejected')
+    : users.filter(u => u.verificationStatus === 'pending');
 
   return (
     <div style={d.wrap}>
@@ -48,7 +69,7 @@ export default function AdminDoctors() {
 
       {/* Filter tabs */}
       <div style={d.tabs}>
-        {[['all','All Doctors'],['pending','Pending Approval'],['verified','Verified']].map(([v,l]) => (
+        {[['all','All Doctors'],['pending','Pending Approval'],['verified','Verified'],['rejected','Rejected']].map(([v,l]) => (
           <button key={v} onClick={() => setFilter(v)}
             style={{ ...d.tab, ...(filter === v ? d.tabActive : {}) }}>{l}</button>
         ))}
@@ -66,22 +87,33 @@ export default function AdminDoctors() {
                   <div style={d.name}>{doc.name}</div>
                   <div style={d.email}>{doc.email}</div>
                   <div style={d.joined}>Joined {new Date(doc.createdAt).toLocaleDateString()}</div>
+                  {doc.verificationStatus === 'rejected' && (
+                    <div style={d.reason}>Reason: {doc.verificationRejectedReason || '—'}</div>
+                  )}
                 </div>
               </div>
               <div style={d.cardRight}>
-                <span style={{ ...d.badge, ...(doc.isVerified ? d.badgeGreen : d.badgeAmber) }}>
-                  {doc.isVerified ? '✓ Verified' : 'Pending'}
+                <span style={{ ...d.badge, ...(doc.verificationStatus === 'verified' ? d.badgeGreen : doc.verificationStatus === 'rejected' ? d.badgeRed : d.badgeAmber) }}>
+                  {doc.verificationStatus === 'verified' ? '✓ Verified' : doc.verificationStatus === 'rejected' ? 'Rejected' : 'Pending'}
+                </span>
+                <span style={{ ...d.badge, ...(doc.isActive ? d.badgeBlue : d.badgeGray) }}>
+                  {doc.isActive ? 'Active' : 'Inactive'}
                 </span>
                 <div style={d.actions}>
-                  {!doc.isVerified && (
+                  {doc.verificationStatus === 'pending' && (
                     <button onClick={() => handleVerify(doc._id)} style={d.verifyBtn}>
                       Verify
                     </button>
                   )}
-                  {doc.isVerified && (
-                    <button onClick={() => handleDeactivate(doc._id)} style={d.deactBtn}>
-                      Deactivate
+                  {doc.verificationStatus === 'pending' && (
+                    <button onClick={() => handleReject(doc._id)} style={d.rejectBtn}>
+                      Reject
                     </button>
+                  )}
+                  {doc.isActive ? (
+                    <button onClick={() => handleDeactivate(doc._id)} style={d.deactBtn}>Deactivate</button>
+                  ) : (
+                    <button onClick={() => handleActivate(doc._id)} style={d.actBtn}>Activate</button>
                   )}
                 </div>
               </div>
@@ -109,11 +141,17 @@ const d = {
   name:       { fontSize: 14, fontWeight: 700, color: '#0b1f3a' },
   email:      { fontSize: 12, color: '#7a92aa', marginTop: 2 },
   joined:     { fontSize: 11, color: '#b0c4d8', marginTop: 2 },
+  reason:     { fontSize: 11, color: '#b45309', marginTop: 6, maxWidth: 420 },
   cardRight:  { display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 },
   badge:      { fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20 },
   badgeGreen: { background: '#f0fdf4', color: '#16a34a' },
   badgeAmber: { background: '#fef3c7', color: '#d97706' },
+  badgeRed:   { background: '#fee2e2', color: '#b91c1c' },
+  badgeBlue:  { background: '#dbeafe', color: '#1d4ed8' },
+  badgeGray:  { background: '#f0f4f9', color: '#7a92aa' },
   actions:    { display: 'flex', gap: 8 },
   verifyBtn:  { padding: '7px 16px', background: '#1a0533', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+  rejectBtn:  { padding: '7px 16px', background: '#fff7ed', color: '#c2410c', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 },
   deactBtn:   { padding: '7px 16px', background: '#fff5f5', color: '#e53e3e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+  actBtn:     { padding: '7px 16px', background: '#1a0533', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 },
 };

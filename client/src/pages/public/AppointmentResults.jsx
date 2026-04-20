@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import PublicNavbar from "../../components/PublicNavbar";
 
 const toDateKeyLocal = (value) => {
   const d = new Date(value);
@@ -40,6 +41,7 @@ const groupSlotsByDate = (slots) => {
 export default function AppointmentResults() {
   const navigate = useNavigate();
   const location = useLocation();
+  const aiNote = location.state?.aiNote || '';
 
   const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const name = query.get("name") || "";
@@ -102,8 +104,9 @@ export default function AppointmentResults() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <PublicNavbar />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(circle_at_15%_20%,rgba(147,197,253,0.35),transparent_38%),radial-gradient(circle_at_88%_14%,rgba(30,64,175,0.2),transparent_30%)]" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-14">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-24 pb-14">
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -157,6 +160,14 @@ export default function AppointmentResults() {
             </div>
           ) : (
             <div className="p-4 sm:p-6 space-y-6">
+              {aiNote && (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  <div className="font-extrabold mb-1">From Symptom Checker</div>
+                  <div className="text-xs font-semibold text-blue-800 opacity-90">
+                    Your symptom summary will be pre-filled into appointment notes.
+                  </div>
+                </div>
+              )}
               {date && (
                 <div className="text-sm font-bold text-slate-700">
                   {formatDateHeading(date)}
@@ -264,6 +275,7 @@ export default function AppointmentResults() {
                                             specialization: d.specialization,
                                             appointmentDate: s.date,
                                             appointmentTime: s.startTime,
+                                            notes: aiNote || undefined,
                                           },
                                         });
                                       }}

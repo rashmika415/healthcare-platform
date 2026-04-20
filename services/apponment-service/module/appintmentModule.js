@@ -44,6 +44,22 @@ const Appointment = new mongoose.Schema({
   },
   notes: {
     type: String
+  },
+  appointmentReminder24hSentAt: {
+    type: Date,
+    default: null
+  },
+  appointmentReminder1hSentAt: {
+    type: Date,
+    default: null
+  },
+  followUpReminderSentAt: {
+    type: Date,
+    default: null
+  },
+  completedAt: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 

@@ -82,6 +82,11 @@ export const getPatientMedicalHistory = async () => {
   return response.data;
 };
 
+export const getPatientSmartSummary = async () => {
+  const response = await api.get('/patients/smart-summary');
+  return response.data;
+};
+
 export const getDoctorSharedReports = async () => {
   const response = await api.get('/patients/reports/shared/me');
   return response.data;

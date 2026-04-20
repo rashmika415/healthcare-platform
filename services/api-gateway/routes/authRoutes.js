@@ -39,11 +39,19 @@ router.post('/register', async (req, res) => {
     // 10 = salt rounds (how strong the hashing is)
 
     // 5. Save user to MongoDB
+    const isDoctor = role === 'doctor';
     const newUser = await User.create({
       name,
       email,
       password: hashedPassword,
-      role
+      role,
+      isActive: true,
+      // Doctors must be approved by admin
+      isVerified: isDoctor ? false : true,
+      verificationStatus: isDoctor ? 'pending' : 'verified',
+      verificationRejectedReason: null,
+      verificationDecidedAt: isDoctor ? null : new Date(),
+      verificationDecidedBy: isDoctor ? null : 'self-register'
     });
 
     // 6. Create JWT token
@@ -67,7 +75,9 @@ router.post('/register', async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         role:  newUser.role,
-        isVerified: newUser.isVerified
+        isVerified: newUser.isVerified,
+        isActive: newUser.isActive,
+        verificationStatus: newUser.verificationStatus
       }
     });
 
@@ -130,7 +140,9 @@ router.post('/login', async (req, res) => {
         name:  user.name,
         email: user.email,
         role:  user.role,
-        isVerified: user.isVerified
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        verificationStatus: user.verificationStatus
       }
     });
 
@@ -167,14 +179,16 @@ router.get('/me', (req, res) => {
     // (Keeping minimal changes to existing structure.)
     // We cannot mark this handler async without changing the signature; instead,
     // we do a blocking-style promise chain and return inside.
-    return User.findById(_id).select('isVerified').then((dbUser) => {
+    return User.findById(_id).select('isVerified isActive verificationStatus').then((dbUser) => {
       res.json({
         user: {
           id:    decoded.id,
           name:  decoded.name,
           email: decoded.email,
           role:  decoded.role,
-          isVerified: dbUser && dbUser.isVerified ? true : false
+          isVerified: dbUser && dbUser.isVerified ? true : false,
+          isActive: dbUser && dbUser.isActive ? true : false,
+          verificationStatus: dbUser?.verificationStatus || 'verified'
         }
       });
     }).catch(() => {
@@ -184,7 +198,9 @@ router.get('/me', (req, res) => {
           name:  decoded.name,
           email: decoded.email,
           role:  decoded.role,
-          isVerified: false
+          isVerified: false,
+          isActive: false,
+          verificationStatus: 'verified'
         }
       });
     });

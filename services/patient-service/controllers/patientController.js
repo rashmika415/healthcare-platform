@@ -16,6 +16,226 @@ const sortByDateDesc = (items) => items.sort((a, b) => {
   return bDate - aDate;
 });
 
+const HIGH_RISK_KEYWORDS = [
+  'chest pain',
+  'shortness of breath',
+  'bleeding',
+  'fainting',
+  'stroke',
+  'severe pain',
+  'uncontrolled',
+  'critical',
+  'urgent'
+];
+
+const asText = (value) => String(value || '').trim();
+
+const inferScheduleFromText = (text) => {
+  const lower = asText(text).toLowerCase();
+  if (!lower) return 'As advised by your doctor';
+
+  if (lower.includes('once daily') || lower.includes('once a day') || lower.includes('daily')) {
+    return 'Once daily';
+  }
+  if (lower.includes('twice daily') || lower.includes('two times')) {
+    return 'Twice daily';
+  }
+  if (lower.includes('thrice daily') || lower.includes('three times')) {
+    return 'Three times daily';
+  }
+  if (lower.includes('morning') || lower.includes('night') || lower.includes('evening')) {
+    return 'Take at noted times (morning/evening/night)';
+  }
+  if (lower.includes('after food') || lower.includes('after meal')) {
+    return 'Take after meals';
+  }
+  if (lower.includes('before food') || lower.includes('before meal')) {
+    return 'Take before meals';
+  }
+
+  return 'Follow doctor instructions';
+};
+
+const summarizeChanges = (lastVisit, previousVisit) => {
+  if (!lastVisit && !previousVisit) {
+    return ['No visit history yet. Book a consultation to start your medical timeline.'];
+  }
+
+  if (lastVisit && !previousVisit) {
+    const diagnosis = asText(lastVisit.diagnosis) || 'a new consultation note';
+    return [`This is your first recorded visit with diagnosis: ${diagnosis}.`];
+  }
+
+  const changes = [];
+  const lastDiagnosis = asText(lastVisit?.diagnosis).toLowerCase();
+  const prevDiagnosis = asText(previousVisit?.diagnosis).toLowerCase();
+
+  if (lastDiagnosis && prevDiagnosis && lastDiagnosis !== prevDiagnosis) {
+    changes.push(`Diagnosis changed from "${asText(previousVisit.diagnosis)}" to "${asText(lastVisit.diagnosis)}".`);
+  } else if (lastDiagnosis) {
+    changes.push(`Current diagnosis remains "${asText(lastVisit.diagnosis)}".`);
+  }
+
+  if (asText(lastVisit?.doctorName) && asText(previousVisit?.doctorName)
+    && asText(lastVisit.doctorName).toLowerCase() !== asText(previousVisit.doctorName).toLowerCase()) {
+    changes.push(`Consulting doctor changed from Dr. ${asText(previousVisit.doctorName)} to Dr. ${asText(lastVisit.doctorName)}.`);
+  }
+
+  if (asText(lastVisit?.specialty) && asText(previousVisit?.specialty)
+    && asText(lastVisit.specialty).toLowerCase() !== asText(previousVisit.specialty).toLowerCase()) {
+    changes.push(`Care specialty changed from ${asText(previousVisit.specialty)} to ${asText(lastVisit.specialty)}.`);
+  }
+
+  if (asText(lastVisit?.notes)) {
+    changes.push(`Latest doctor note: ${asText(lastVisit.notes)}.`);
+  }
+
+  if (!changes.length) {
+    changes.push('No major clinical changes found since your previous visit. Continue current care plan.');
+  }
+
+  return changes.slice(0, 4);
+};
+
+const buildRedFlags = (lastVisit, latestPrescription) => {
+  const redFlags = [];
+  const clinicalText = [
+    asText(lastVisit?.diagnosis),
+    asText(lastVisit?.notes),
+    asText(latestPrescription?.instructions)
+  ].join(' ').toLowerCase();
+
+  HIGH_RISK_KEYWORDS.forEach((keyword) => {
+    if (clinicalText.includes(keyword)) {
+      redFlags.push({
+        severity: ['stroke', 'bleeding', 'shortness of breath', 'chest pain'].includes(keyword) ? 'high' : 'medium',
+        message: `Watch for worsening symptoms related to "${keyword}" and seek urgent care if severe.`
+      });
+    }
+  });
+
+  if (asText(lastVisit?.diagnosis).toLowerCase().includes('fever')) {
+    redFlags.push({
+      severity: 'medium',
+      message: 'If fever persists more than 3 days or rises above 102F, contact your doctor quickly.'
+    });
+  }
+
+  if (asText(lastVisit?.diagnosis).toLowerCase().includes('diabetes')) {
+    redFlags.push({
+      severity: 'medium',
+      message: 'Monitor blood sugar closely. Seek help for dizziness, confusion, or very high/low readings.'
+    });
+  }
+
+  if (asText(lastVisit?.diagnosis).toLowerCase().includes('hypertension')) {
+    redFlags.push({
+      severity: 'high',
+      message: 'Track blood pressure. Seek urgent help for severe headache, chest pain, or breathlessness.'
+    });
+  }
+
+  if (!redFlags.length) {
+    redFlags.push({
+      severity: 'low',
+      message: 'If symptoms worsen, new severe pain appears, or breathing becomes difficult, seek immediate care.'
+    });
+  }
+
+  const uniqueByMessage = [];
+  const seenMessages = new Set();
+  redFlags.forEach((flag) => {
+    const key = asText(flag?.message).toLowerCase();
+    if (!key || seenMessages.has(key)) return;
+    seenMessages.add(key);
+    uniqueByMessage.push({
+      severity: ['high', 'medium', 'low'].includes(flag?.severity) ? flag.severity : 'medium',
+      message: asText(flag?.message)
+    });
+  });
+
+  return uniqueByMessage.slice(0, 4);
+};
+
+// ─────────────────────────────────────────────────────
+// GET /patients/smart-summary
+// Patient-friendly summary from history and prescriptions
+// ─────────────────────────────────────────────────────
+exports.getSmartMedicalSummary = async (req, res) => {
+  try {
+    const patient = await Patient
+      .findOne({ userId: req.user.id })
+      .select('medicalHistory prescriptions');
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const history = [...(patient.medicalHistory || [])].sort((a, b) => {
+      const aTime = toValidDate(a?.date)?.getTime() || 0;
+      const bTime = toValidDate(b?.date)?.getTime() || 0;
+      return bTime - aTime;
+    });
+
+    const prescriptions = [...(patient.prescriptions || [])].sort((a, b) => {
+      const aTime = toValidDate(a?.issuedAt)?.getTime() || 0;
+      const bTime = toValidDate(b?.issuedAt)?.getTime() || 0;
+      return bTime - aTime;
+    });
+
+    const lastVisit = history[0] || null;
+    const previousVisit = history[1] || null;
+    const latestPrescription = prescriptions[0] || null;
+
+    const whatChangedSinceLastVisit = summarizeChanges(lastVisit, previousVisit);
+    const currentMedicines = (latestPrescription?.medicines || []).map((medicine) => {
+      const doseText = asText(medicine?.dosage);
+      const durationText = asText(medicine?.duration);
+      const notesText = asText(medicine?.notes);
+      const scheduleSource = [doseText, durationText, notesText, asText(latestPrescription?.instructions)].join(' ');
+
+      return {
+        name: asText(medicine?.name) || 'Medicine',
+        dosage: doseText || 'As prescribed',
+        duration: durationText || 'As advised',
+        schedule: inferScheduleFromText(scheduleSource),
+        notes: notesText || null
+      };
+    });
+
+    const redFlagsToWatch = buildRedFlags(lastVisit, latestPrescription);
+
+    return res.status(200).json({
+      lastUpdatedAt: new Date().toISOString(),
+      lastVisitDate: lastVisit?.date || null,
+      whatChangedSinceLastVisit,
+      currentMedicines,
+      redFlagsToWatch,
+      visitSnapshot: {
+        lastVisit: lastVisit
+          ? {
+            date: lastVisit.date || null,
+            doctorName: asText(lastVisit.doctorName) || null,
+            specialty: asText(lastVisit.specialty) || null,
+            diagnosis: asText(lastVisit.diagnosis) || null
+          }
+          : null,
+        previousVisit: previousVisit
+          ? {
+            date: previousVisit.date || null,
+            doctorName: asText(previousVisit.doctorName) || null,
+            specialty: asText(previousVisit.specialty) || null,
+            diagnosis: asText(previousVisit.diagnosis) || null
+          }
+          : null
+      }
+    });
+  } catch (err) {
+    console.error('getSmartMedicalSummary error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 // ─────────────────────────────────────────────────────
 // POST /patients/profile
 // Create profile after first login

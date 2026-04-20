@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import axios from "axios";
-
-const API_BASE =
-  process.env.REACT_APP_APPOINTMENT_URL?.replace(/\/$/, "") ||
-  "http://localhost:3003";
+import api from "../../services/api";
 
 export default function AdminAppointments() {
   const { user, logout } = useAuth();
@@ -20,7 +16,7 @@ export default function AdminAppointments() {
 
   const fetchAppointments = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/appointments/getallappointments`);
+      const res = await api.get(`/admin/appointments`);
       setAppointments(res.data?.appointments || []);
     } catch (error) {
       console.error("Error fetching appointments:", error);
