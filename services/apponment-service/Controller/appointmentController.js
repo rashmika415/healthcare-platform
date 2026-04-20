@@ -169,7 +169,11 @@ const updateappointment = async (req, res) => {
       "time",
       "status",
       "paymentStatus",
-      "notes",
+            "notes",
+            "appointmentReminder24hSentAt",
+            "appointmentReminder1hSentAt",
+            "followUpReminderSentAt",
+            "completedAt",
     ];
 
     allowedFields.forEach((field) => {
@@ -183,6 +187,15 @@ const updateappointment = async (req, res) => {
       updateData,
       { new: true }
     );
+
+        if (
+            appointment
+            && String(updateData.status || '').toUpperCase() === 'COMPLETED'
+            && !appointment.completedAt
+        ) {
+            appointment.completedAt = new Date();
+            await appointment.save();
+        }
 
     if (!appointment) {
       return res.status(404).json({ message: "Unable to update appointment" });

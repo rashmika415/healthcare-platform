@@ -3,6 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
+const { startReminderScheduler } = require("./Services/reminderScheduler");
 
 const app = express();
 
@@ -26,7 +27,10 @@ const PORT = Number(process.env.PORT) || 3005;
 
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("Notification DB Connected"))
+  .then(() => {
+    console.log("Notification DB Connected");
+    startReminderScheduler();
+  })
   .catch((err) => console.log(err));
 
 app.listen(PORT, () => {
