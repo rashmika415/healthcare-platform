@@ -5,6 +5,18 @@ const axios = require("axios");
 const DOCTOR_SERVICE_URL =
     process.env.DOCTOR_SERVICE_URL || "http://localhost:3002";
 
+const normalizeBaseUrl = (value) =>
+  String(value || "").trim().replace(/\/$/, "");
+
+const notificationServiceBases = () => {
+  const envBase = normalizeBaseUrl(process.env.NOTIFICATION_SERVICE_URL);
+  return [
+    ...new Set(
+      [envBase, "http://localhost:3005", "http://notification-service:3005"].filter(Boolean)
+    )
+  ];
+};
+
 /** Public list for booking UI — server-side call avoids browser CORS to doctor service */
 const getVerifiedDoctorsForBooking = async (req, res) => {
     try {
@@ -103,6 +115,18 @@ notes
 } = req.body;
 
 try {
+if (
+  !patientId ||
+  !doctorId ||
+  !patientName ||
+  !patientEmail ||
+  !doctorName ||
+  !specialization ||
+  !date ||
+  !time
+) {
+  return res.status(400).json({ error: "Missing required appointment fields" });
+}
 
 const appointment = await Appointment.create({
 patientId,
@@ -116,16 +140,35 @@ time,
 notes
 });
 
-const notificationBaseUrl =
-  (process.env.NOTIFICATION_SERVICE_URL || "").trim().replace(/\/$/, "") ||
-  "http://notification-service:3005";
+try {
+  const payload = {
+    patientId,
+    appointmentId: appointment._id,
+    type: "APPOINTMENT",
+    message: `Appointment booked with Dr.${doctorName} on ${date} at ${time}`
+  };
+  let delivered = false;
 
-await axios.post(`${notificationBaseUrl}/notifications/create`, {
-patientId,
-appointmentId: appointment._id,
-type: "APPOINTMENT",
-message: `Appointment booked with Dr.${doctorName} on ${date} at ${time}`
-});
+  for (const baseUrl of notificationServiceBases()) {
+    try {
+      await axios.post(`${baseUrl}/notifications/create`, payload, { timeout: 8000 });
+      delivered = true;
+      break;
+    } catch (err) {
+      console.warn(`Notification send failed via ${baseUrl}:`, err.message);
+    }
+  }
+
+  if (!delivered) {
+    console.warn("Appointment created, but notification dispatch failed on all configured endpoints.");
+  }
+} catch (notificationError) {
+  // Keep booking flow resilient even when notification service is unavailable.
+  console.warn(
+    "Appointment created, but notification dispatch failed:",
+    notificationError.message
+  );
+}
 
 res.status(201).json({ appointment });
 
