@@ -1110,6 +1110,126 @@ exports.getMySharedReportsAsDoctor = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────
+// POST /patients/reports/:reportId/doctor-note
+// Doctor adds a note to a shared report
+// ─────────────────────────────────────────────────────
+exports.addDoctorNoteToReport = async (req, res) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Only doctors can add notes to reports' });
+    }
+
+    const note = String(req.body?.note || '').trim();
+    if (!note) {
+      return res.status(400).json({ error: 'note is required' });
+    }
+
+    const reportId = req.params.reportId;
+    const patient = await Patient
+      .findOne({
+        medicalReports: {
+          $elemMatch: {
+            _id: reportId,
+            sharedWithDoctors: req.user.id,
+            status: { $ne: 'deleted' }
+          }
+        }
+      })
+      .select('userId name email');
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Report not found or not shared with this doctor' });
+    }
+
+    // Atomic update avoids full-document revalidation on legacy report records.
+    const updateResult = await Patient.updateOne(
+      {
+        _id: patient._id,
+        medicalReports: {
+          $elemMatch: {
+            _id: reportId,
+            sharedWithDoctors: req.user.id,
+            status: { $ne: 'deleted' }
+          }
+        }
+      },
+      {
+        $push: {
+          'medicalReports.$.doctorNotes': {
+            doctorUserId: req.user.id,
+            doctorName: req.user.name,
+            note,
+            createdAt: new Date(),
+            isRead: false
+          }
+        },
+        $set: {
+          'medicalReports.$.updatedBy': req.user.id
+        }
+      }
+    );
+
+    if (!updateResult.modifiedCount) {
+      return res.status(404).json({ error: 'Report not found or not shared with this doctor' });
+    }
+
+    return res.status(200).json({
+      message: 'Note sent to patient',
+      patient: {
+        userId: patient.userId,
+        name: patient.name,
+        email: patient.email
+      }
+    });
+  } catch (err) {
+    console.error('addDoctorNoteToReport error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
+// POST /patients/reports/:reportId/doctor-note/read
+// Patient marks doctor notes as read
+// ─────────────────────────────────────────────────────
+exports.markReportNotesRead = async (req, res) => {
+  try {
+    if (req.user.role !== 'patient') {
+      return res.status(403).json({ error: 'Only patients can mark notes as read' });
+    }
+
+    const updateResult = await Patient.updateOne(
+      {
+        userId: req.user.id,
+        medicalReports: {
+          $elemMatch: {
+            _id: req.params.reportId,
+            status: { $ne: 'deleted' }
+          }
+        }
+      },
+      {
+        $set: {
+          'medicalReports.$.doctorNotes.$[note].isRead': true,
+          'medicalReports.$.updatedBy': req.user.id
+        }
+      },
+      {
+        arrayFilters: [{ 'note.isRead': { $ne: true } }]
+      }
+    );
+
+    if (!updateResult.matchedCount) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    return res.status(200).json({ message: 'Notes marked as read' });
+  } catch (err) {
+    console.error('markReportNotesRead error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────
 // DELETE /patients/reports/:reportId
 // Soft delete report and remove remote file
 // ─────────────────────────────────────────────────────

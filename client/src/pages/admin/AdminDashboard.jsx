@@ -1,4 +1,3 @@
-// client/src/pages/admin/AdminDashboard.jsx
 import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -10,17 +9,14 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ NEW: notification state
   const [notification, setNotification] = useState(null);
   const prevPendingRef = useRef(null);
 
-  // ✅ FETCH STATS FUNCTION (reusable)
   const fetchStats = async () => {
     try {
       const res = await api.get('/admin/stats');
       setStats(res.data);
 
-      // ✅ Show bell notification only when pending count increases
       const pending = res.data?.pendingDoctors || 0;
       const prev = prevPendingRef.current ?? pending;
 
@@ -32,7 +28,6 @@ export default function AdminDashboard() {
       }
 
       prevPendingRef.current = pending;
-
     } catch (err) {
       console.error('Error fetching stats:', err);
       setStats(null);
@@ -41,13 +36,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ INITIAL LOAD + AUTO REFRESH
   useEffect(() => {
     fetchStats();
-
-    // auto refresh every 10 seconds
     const interval = setInterval(fetchStats, 10000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -60,15 +51,17 @@ export default function AdminDashboard() {
     <div style={s.root}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');*{box-sizing:border-box}`}</style>
 
-      {/* Sidebar */}
       <aside style={s.sidebar}>
         <div style={s.brand}><span style={s.dot}/>Nexus Health</div>
         <div style={s.adminBadge}>Admin Panel</div>
+
         <nav style={s.nav}>
           {[
             { label: 'Dashboard', path: '/admin/dashboard' },
             { label: 'Doctors', path: '/admin/doctors' },
             { label: 'Patients', path: '/admin/patients' },
+            { label: 'Appointments', path: '/admin/appointments' },   // NEW
+            { label: 'Video Sessions', path: '/admin/video' },
             { label: 'Transactions', path: '/admin/transactions' },
           ].map(item => (
             <Link key={item.path} to={item.path} style={s.navItem}>
@@ -76,15 +69,14 @@ export default function AdminDashboard() {
             </Link>
           ))}
         </nav>
+
         <button onClick={handleLogout} style={s.logoutBtn}>← Logout</button>
       </aside>
 
-      {/* Main */}
       <main style={s.main}>
         <div style={s.topBar}>
           <h1 style={s.title}>Dashboard</h1>
 
-          {/* Top-right: Bell + admin info */}
           <div style={s.topRight}>
             <Link to="/admin/doctors" style={s.bellBtn} aria-label="Pending doctor verifications">
               <span style={s.bellIcon}>🔔</span>
@@ -110,7 +102,6 @@ export default function AdminDashboard() {
           <div style={s.msg}>Loading stats...</div>
         ) : (
           <>
-            {/* Stat cards */}
             <div style={s.statsGrid}>
               {[
                 { label: 'Total Users', value: stats?.totalUsers || 0, color: '#1a56db', bg: '#ebf2ff' },
@@ -126,7 +117,6 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Quick links */}
             <div style={s.quickGrid}>
               <Link to="/admin/doctors" style={s.quickCard}>
                 <div style={s.quickIcon}>🩺</div>
@@ -142,10 +132,24 @@ export default function AdminDashboard() {
                 <div style={s.quickArrow}>→</div>
               </Link>
 
+              <Link to="/admin/appointments" style={s.quickCard}>
+                <div style={s.quickIcon}>📅</div>
+                <div style={s.quickTitle}>Appointments</div>
+                <div style={s.quickCount}>View all appointments</div>
+                <div style={s.quickArrow}>→</div>
+              </Link>
+
               <Link to="/admin/transactions" style={s.quickCard}>
                 <div style={s.quickIcon}>💳</div>
                 <div style={s.quickTitle}>Transactions</div>
                 <div style={s.quickCount}>View all payments</div>
+                <div style={s.quickArrow}>→</div>
+              </Link>
+
+              <Link to="/admin/video" style={s.quickCard}>
+                <div style={s.quickIcon}>🎥</div>
+                <div style={s.quickTitle}>Video Management</div>
+                <div style={s.quickCount}>Monitor consultations</div>
                 <div style={s.quickArrow}>→</div>
               </Link>
             </div>
@@ -203,8 +207,6 @@ const s = {
   rightMeta: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end' },
   adminInfo: { fontSize: 13, color: '#7a92aa' },
   msg: { color: '#7a92aa', fontSize: 14 },
-
-  // ✅ NEW notification style
   notification: {
     background: '#fff3cd',
     color: '#856404',
@@ -214,13 +216,11 @@ const s = {
     marginBottom: 6,
     border: '1px solid #ffeeba'
   },
-
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 24 },
   statCard: { background: '#fff', borderRadius: 14, padding: 22, border: '1px solid #e4ecf7', position: 'relative', overflow: 'hidden' },
   statNum: { fontSize: 34, fontWeight: 800, letterSpacing: '-1px', marginBottom: 4 },
   statLabel: { fontSize: 13, color: '#7a92aa', fontWeight: 500 },
   statBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 4 },
-
   quickGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 },
   quickCard: { background: '#fff', borderRadius: 14, padding: 24, border: '1px solid #e4ecf7', textDecoration: 'none', display: 'block', position: 'relative', transition: 'box-shadow 0.2s' },
   quickIcon: { fontSize: 28, marginBottom: 12 },

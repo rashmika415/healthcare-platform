@@ -13,6 +13,10 @@ router.get(
     "/patient/:patientId",
     appointmentController.getAppointmentsByPatientId
 );
+router.get(
+    "/doctor/:doctorId",
+    appointmentController.getAppointmentsByDoctorId
+);
 router.post("/createappointment", appointmentController.createappointment);
 router.get("/getappointmentbyid/:id", appointmentController.getappointmentbyid);
 router.put("/updateappointment/:id", appointmentController.updateappointment);

@@ -1,4 +1,4 @@
-import { Search, Bell } from "lucide-react";
+import { Bell } from "lucide-react";
 
 export default function Topbar() {
   const hour = new Date().getHours();
@@ -15,15 +15,15 @@ export default function Topbar() {
   const firstName = user?.name?.split(" ")[0] || "Doctor";
 
   return (
-    <div className="flex justify-between items-center mb-8">
+    <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-2xl px-4 py-3 flex justify-between items-center mb-6 shadow-sm">
       <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
             {greeting}, Dr. {firstName}!
           </h1>
-          <span className="text-2xl">👋</span>
+          <span className="text-xl">👋</span>
         </div>
-        <p className="text-sm text-slate-400 mt-0.5">
+        <p className="text-xs text-slate-500 mt-0.5">
           {new Date().toLocaleDateString("en-US", {
             weekday: "long", month: "long", day: "numeric"
           })}
@@ -31,17 +31,8 @@ export default function Topbar() {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Search */}
-        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm hover:shadow-md transition-shadow">
-          <Search size={14} className="text-slate-400" />
-          <input
-            placeholder="Search patients..."
-            className="text-sm outline-none bg-transparent w-44 text-slate-600 placeholder-slate-400"
-          />
-        </div>
-
         {/* Bell */}
-        <button className="relative w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm hover:shadow-md hover:bg-slate-50 transition-all">
+        <button className="relative w-10 h-10 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-slate-100 transition-all">
           <Bell size={15} className="text-slate-500" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
         </button>

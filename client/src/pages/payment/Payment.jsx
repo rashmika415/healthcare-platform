@@ -13,7 +13,7 @@ import {
 } from "@stripe/react-stripe-js";
 
 const PAYMENT_API_BASE_URL =
-  process.env.REACT_APP_PAYMENT_URL || "http://localhost:3104";
+  process.env.REACT_APP_PAYMENT_URL || "http://localhost:3000";
 
 // ✅ FIXED KEY (same as backend account)
 const stripeKey =
@@ -35,6 +35,9 @@ function CheckoutForm() {
   const [clientSecret, setClientSecret] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [consultationFee, setConsultationFee] = useState(5000);
+  const [feeLoading, setFeeLoading] = useState(true);
+  const [agreedToPayment, setAgreedToPayment] = useState(false);
 
   useEffect(() => {
     const fetchPaymentIntent = async () => {
@@ -60,12 +63,38 @@ function CheckoutForm() {
       }
     };
 
+    const fetchConsultationFee = async () => {
+      try {
+        const appointmentRes = await axios.get(
+          `${PAYMENT_API_BASE_URL}/appointments/getappointmentbyid/${appointmentId}`
+        );
+        const doctorId = appointmentRes.data?.appointment?.doctorId;
+        if (!doctorId) {
+          setConsultationFee(5000);
+          return;
+        }
+
+        const doctorRes = await axios.get(
+          `${PAYMENT_API_BASE_URL}/public/doctors/${doctorId}`
+        );
+        const fee = Number(doctorRes.data?.doctor?.consultationFee);
+        setConsultationFee(Number.isFinite(fee) && fee > 0 ? fee : 5000);
+      } catch (err) {
+        console.error("Failed to fetch consultation fee:", err);
+        setConsultationFee(5000);
+      } finally {
+        setFeeLoading(false);
+      }
+    };
+
     if (!appointmentId) {
       setErrorMessage("No appointment selected. Please book an appointment first.");
+      setFeeLoading(false);
       return;
     }
 
     fetchPaymentIntent();
+    fetchConsultationFee();
   }, [appointmentId]);
 
   const handlePay = async (e) => {
@@ -144,31 +173,52 @@ function CheckoutForm() {
           </div>
         )}
 
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">Card Number</label>
-            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-              <CardNumberElement options={{ style: elementStyles }} />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">Expiry Date</label>
-            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-              <CardExpiryElement options={{ style: elementStyles }} />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">CVC</label>
-            <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-              <CardCvcElement options={{ style: elementStyles }} />
-            </div>
-          </div>
+        <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <p className="text-sm font-medium text-slate-700">
+            Doctor Consultation Fee:{" "}
+            <span className="font-bold text-slate-900">
+              {feeLoading ? "Loading..." : `Rs.${consultationFee}`}
+            </span>
+          </p>
         </div>
 
+        <label className="mb-4 flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={agreedToPayment}
+            onChange={(e) => setAgreedToPayment(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span>I agree to proceed with this payment.</span>
+        </label>
+
+        {agreedToPayment && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">Card Number</label>
+              <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                <CardNumberElement options={{ style: elementStyles }} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">Expiry Date</label>
+              <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                <CardExpiryElement options={{ style: elementStyles }} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">CVC</label>
+              <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                <CardCvcElement options={{ style: elementStyles }} />
+              </div>
+            </div>
+          </div>
+        )}
+
         <button
-          disabled={!stripe || loading || !clientSecret || !!errorMessage}
+          disabled={!stripe || loading || !clientSecret || !!errorMessage || !agreedToPayment}
           className="mt-6 bg-blue-600 text-white w-full py-3 rounded-2xl text-sm font-semibold shadow-lg shadow-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? "Processing..." : "Pay Now"}

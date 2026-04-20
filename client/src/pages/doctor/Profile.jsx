@@ -48,6 +48,13 @@ export default function DoctorProfile() {
       }));
 
       try {
+        // Source of truth for verification is authdb (gateway)
+        // (Admin can verify after the token is issued.)
+        const meRes = await api.get("/auth/me").catch(() => null);
+        if (meRes?.data?.user && typeof meRes.data.user.isVerified === "boolean") {
+          setIsVerified(meRes.data.user.isVerified);
+        }
+
         const res = await api.get("/doctor/profile");
         const d = res.data;
         console.log("✅ Profile from DB:", d);
@@ -60,7 +67,10 @@ export default function DoctorProfile() {
           bio: d.bio || "",
           consultationFee: d.consultationFee ?? "",
         });
-        setIsVerified(d.isVerified || false);
+        // Prefer authdb verification flag; fallback to doctor-service value.
+        if (typeof d.isVerified === "boolean" && (meRes?.data?.user?.isVerified === undefined)) {
+          setIsVerified(d.isVerified);
+        }
       } catch (err) {
         console.log("❌ Profile error:", err.response?.status, err.response?.data);
         if (err.response?.status === 404) {
@@ -102,6 +112,9 @@ export default function DoctorProfile() {
         consultationFee: Number(form.consultationFee),
       });
       console.log("✅ Profile saved:", res.data);
+      if (res?.data?.doctor && typeof res.data.doctor.isVerified === "boolean") {
+        setIsVerified(res.data.doctor.isVerified);
+      }
       setMessage({ type: "success", text: "Profile saved successfully!" });
     } catch (err) {
       console.log("❌ Save error:", err.response?.status, err.response?.data);
@@ -116,7 +129,7 @@ export default function DoctorProfile() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       <Sidebar />
 
       <div className="flex-1 p-6">

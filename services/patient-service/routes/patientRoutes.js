@@ -34,6 +34,8 @@ router.patch('/reports/:reportId',               c.updateReportMetadata);
 router.patch('/reports/:reportId/archive',       c.archiveReport);
 router.post('/reports/:reportId/share',          c.shareReportWithDoctor);
 router.post('/reports/:reportId/unshare',        c.unshareReportWithDoctor);
+router.post('/reports/:reportId/doctor-note',    c.addDoctorNoteToReport);
+router.post('/reports/:reportId/doctor-note/read', c.markReportNotesRead);
 router.delete('/reports/:reportId',              c.deleteReport);
 
 module.exports = router;

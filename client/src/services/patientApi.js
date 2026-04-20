@@ -87,6 +87,16 @@ export const getDoctorSharedReports = async () => {
   return response.data;
 };
 
+export const addDoctorNoteToReport = async (reportId, note) => {
+  const response = await api.post(`/patients/reports/${reportId}/doctor-note`, { note });
+  return response.data;
+};
+
+export const markReportNotesRead = async (reportId) => {
+  const response = await api.post(`/patients/reports/${reportId}/doctor-note/read`);
+  return response.data;
+};
+
 export const getVerifiedDoctorsForSharing = async () => {
   const response = await api.get('/public/doctors');
   return response.data;

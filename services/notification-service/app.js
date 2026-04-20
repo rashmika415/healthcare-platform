@@ -1,0 +1,27 @@
+//services/notification-service/app.js
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+require("dotenv").config();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// Health check route
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', service: 'notification-service' });
+});
+
+const notificationRoutes = require("./Routes/NotificationRoutes");
+
+app.use("/notifications", notificationRoutes);
+
+mongoose.connect(process.env.MONGO_URI)
+.then(() => console.log("Notification DB Connected"))
+.catch(err => console.log(err));
+
+app.listen(process.env.PORT, () => {
+    console.log(`Notification Service running on ${process.env.PORT}`);
+});

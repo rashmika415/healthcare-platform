@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import PatientLayout from "../../pages/patient/Patientlayout ";
+import { useNavigate } from "react-router-dom";
 
 /** Strip trailing slash and accidental `/appointments` so env can be service root or full prefix */
 function normalizeAppointmentBaseUrl(raw) {
@@ -22,9 +23,14 @@ function appointmentApiBases() {
   );
   return [
     ...new Set(
-      [fromEnv, gatewayBase, "http://localhost:3100"].filter(Boolean)
+      [fromEnv, gatewayBase, "http://localhost:3100", "http://localhost:3103", "http://localhost:3000", "http://localhost:3003"].filter(Boolean)
     ),
   ];
+}
+
+function notificationApiBase() {
+  const fromEnv = process.env.REACT_APP_NOTIFICATION_URL;
+  return (fromEnv && fromEnv.trim().replace(/\/$/, "")) || "http://localhost:3005";
 }
 
 function patientIdFromUser(user) {
@@ -79,11 +85,21 @@ function getStatusBadge(status) {
 
 function AppointmentDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const patientId = useMemo(() => patientIdFromUser(user), [user]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [notificationError, setNotificationError] = useState(null);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.read).length,
+    [notifications]
+  );
 
   useEffect(() => {
     if (authLoading) return;
@@ -94,6 +110,9 @@ function AppointmentDashboard() {
       setError(
         user ? null : "Please log in as a patient to see your appointments."
       );
+      setNotifications([]);
+      setNotificationsLoading(false);
+      setNotificationError(null);
       return;
     }
 
@@ -146,6 +165,112 @@ function AppointmentDashboard() {
     };
   }, [user, authLoading, patientId]);
 
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || !patientId) {
+      setNotifications([]);
+      setNotificationsLoading(false);
+      setNotificationError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setNotificationsLoading(true);
+    setNotificationError(null);
+
+    const loadNotifications = async () => {
+      try {
+        const res = await axios.get(
+          `${notificationApiBase()}/notifications/patient/${encodeURIComponent(patientId)}`,
+          { timeout: 10000 }
+        );
+
+        if (!cancelled) {
+          setNotifications(Array.isArray(res.data) ? res.data : []);
+        }
+      } catch (err) {
+        console.warn("Failed to load notifications:", err.message);
+        if (!cancelled) {
+          setNotificationError("Unable to load notifications.");
+          setNotifications([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setNotificationsLoading(false);
+        }
+      }
+    };
+
+    loadNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading, patientId]);
+
+  const handleToggleNotifications = () => {
+    setIsNotificationsOpen((current) => !current);
+  };
+
+  const handleMarkRead = async (notificationId) => {
+    try {
+      await axios.put(
+        `${notificationApiBase()}/notifications/read/${notificationId}`,
+        {},
+        { timeout: 10000 }
+      );
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification._id === notificationId
+            ? { ...notification, read: true }
+            : notification
+        )
+      );
+    } catch (err) {
+      console.warn("Failed to mark notification read:", err.message);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId) => {
+    const confirmCancel = window.confirm("Are you sure you want to cancel this appointment?");
+    if (!confirmCancel) return;
+
+    const bases = appointmentApiBases();
+
+    for (const base of bases) {
+      try {
+        await axios.put(
+          `${base}/appointments/updateappointment/${appointmentId}`,
+          {
+            status: "CANCELLED"
+          },
+          { timeout: 10000 }
+        );
+
+        setAppointments((prev) =>
+          prev.map((appt) =>
+            appt._id === appointmentId
+              ? { ...appt, status: "CANCELLED" }
+              : appt
+          )
+        );
+
+        alert("Appointment cancelled successfully");
+        return;
+      } catch (error) {
+        console.warn(`Failed to cancel using ${base}:`, error.message);
+      }
+    }
+
+    alert("Failed to cancel appointment");
+  };
+
+  const handleGoToPayment = (appointmentId) => {
+    navigate("/payment", {
+      state: { appointmentId },
+    });
+  };
+
   return (
     <PatientLayout title="Appointments" subtitle="View all your medical appointments">
       <div className="flex flex-col gap-6">
@@ -170,13 +295,84 @@ function AppointmentDashboard() {
         {!loading && !error && (
           <div className="bg-white rounded-3xl shadow-xl border border-slate-200 max-w-5xl mx-auto overflow-hidden">
             <div className="px-8 py-6 bg-slate-50 border-b border-slate-200">
-              <h2 className="text-2xl font-semibold text-slate-900">Your Appointments</h2>
-              <p className="text-slate-500 mt-1">
-                {appointments.length === 0
-                  ? "No appointments found."
-                  : `${appointments.length} appointment${appointments.length === 1 ? '' : 's'} found.`
-                }
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900">Your Appointments</h2>
+                  <p className="text-slate-500 mt-1">
+                    {appointments.length === 0
+                      ? "No appointments found."
+                      : `${appointments.length} appointment${appointments.length === 1 ? '' : 's'} found.`
+                    }
+                  </p>
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={handleToggleNotifications}
+                    className="relative inline-flex items-center justify-center h-10 w-10 rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
+                    aria-label="Notifications"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                      <path d="M12 2a6 6 0 00-6 6v4.586l-.707.707A1 1 0 005 15h14a1 1 0 00.707-1.707L18 12.586V8a6 6 0 00-6-6zm2 16a2 2 0 11-4 0h4z" />
+                    </svg>
+                    {unreadCount > 0 && (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {isNotificationsOpen && (
+                    <div className="absolute right-0 z-20 mt-3 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+                      <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">Notifications</p>
+                            <p className="text-xs text-slate-500">
+                              {notificationsLoading
+                                ? 'Loading...'
+                                : notificationError
+                                ? 'Unable to fetch notifications.'
+                                : `${notifications.length} notification${notifications.length === 1 ? '' : 's'}`}
+                            </p>
+                          </div>
+                          {unreadCount > 0 && (
+                            <span className="rounded-full bg-rose-500 px-2 py-1 text-[11px] font-semibold text-white">
+                              {unreadCount} new
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notificationsLoading ? (
+                          <div className="p-4 text-sm text-slate-500">Loading notifications…</div>
+                        ) : notificationError ? (
+                          <div className="p-4 text-sm text-rose-600">{notificationError}</div>
+                        ) : notifications.length === 0 ? (
+                          <div className="p-4 text-sm text-slate-500">No notifications yet.</div>
+                        ) : (
+                          notifications.map((notification) => (
+                            <button
+                              key={notification._id}
+                              type="button"
+                              onClick={() => handleMarkRead(notification._id)}
+                              className={`w-full text-left px-4 py-4 transition hover:bg-slate-50 ${notification.read ? 'bg-white' : 'bg-slate-50'}`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm text-slate-900">{notification.message}</p>
+                                {!notification.read && (
+                                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                                )}
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">{new Date(notification.createdAt).toLocaleString()}</p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {appointments.length === 0 ? (
@@ -206,23 +402,45 @@ function AppointmentDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
                           <div className="space-y-2">
                             <p>
-                              <span className="font-medium text-slate-900">Specialization:</span>{' '}
+                              <span className="font-medium text-slate-900">Specialization:</span>{" "}
                               {appointment.specialization}
                             </p>
                             <p>
-                              <span className="font-medium text-slate-900">Patient:</span>{' '}
+                              <span className="font-medium text-slate-900">Patient:</span>{" "}
                               {appointment.patientName}
                             </p>
                           </div>
                           <div className="space-y-2">
                             <p>
-                              <span className="font-medium text-slate-900">Date & Time:</span>{' '}
+                              <span className="font-medium text-slate-900">Date & Time:</span>{" "}
                               {fmtDateTime(appointment.date)} {appointment.time}
                             </p>
                             <p>
-                              <span className="font-medium text-slate-900">Notes:</span>{' '}
+                              <span className="font-medium text-slate-900">Notes:</span>{" "}
                               {appointment.notes || "None"}
                             </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <div className="flex flex-wrap items-center gap-3">
+                            {String(appointment.paymentStatus || "").toUpperCase() === "PENDING" &&
+                              appointment.status !== "CANCELLED" && (
+                                <button
+                                  onClick={() => handleGoToPayment(appointment._id)}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                                >
+                                  Payment
+                                </button>
+                              )}
+                            {appointment.status !== "CANCELLED" && (
+                              <button
+                                onClick={() => handleCancelAppointment(appointment._id)}
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition"
+                              >
+                                Cancel
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

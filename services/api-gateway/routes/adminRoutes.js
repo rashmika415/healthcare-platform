@@ -57,11 +57,13 @@ router.put('/verify-doctor/:id', async (req, res) => {
 
     // Notify doctor-service to mark doctor profile verified and email the doctor.
     // Doctor-service updates Doctor.isVerified and sends email.
+    let doctorServiceResult = null;
     try {
       const doctorServiceUrl = process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002';
       const adminId = req.headers['x-user-id'];
       const adminRole = req.headers['x-user-role'];
 
+      // doctor-service mounts doctorRoutes at `/` (not `/doctor`) in services/doctor-service/app.js
       const verifyRes = await fetch(`${doctorServiceUrl}/verify-by-user/${user._id}`, {
         method: 'PATCH',
         headers: {
@@ -75,16 +77,19 @@ router.put('/verify-doctor/:id', async (req, res) => {
         }
       });
 
+      const body = await verifyRes.json().catch(() => ({}));
+      doctorServiceResult = { ok: verifyRes.ok, status: verifyRes.status, body };
+
       if (!verifyRes.ok) {
-        const body = await verifyRes.json().catch(() => ({}));
         // Non-fatal: user is already verified in gateway; email might fail if doctor profile not found.
         console.warn('Doctor-service verify-by-user failed:', verifyRes.status, body?.error || body?.message);
       }
     } catch (e) {
       console.warn('Doctor-service call failed:', e.message);
+      doctorServiceResult = { ok: false, status: 0, body: { error: e.message } };
     }
 
-    res.json({ message: 'Doctor verified successfully', user });
+    res.json({ message: 'Doctor verified successfully', user, doctorServiceResult });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
