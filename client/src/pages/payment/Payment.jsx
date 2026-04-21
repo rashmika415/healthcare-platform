@@ -13,7 +13,9 @@ import {
 } from "@stripe/react-stripe-js";
 
 const PAYMENT_API_BASE_URL =
-  process.env.REACT_APP_PAYMENT_URL || "http://localhost:3000";
+  process.env.REACT_APP_PAYMENT_URL ||
+  process.env.REACT_APP_API_BASE_URL ||
+  "http://localhost:3000";
 
 // ✅ FIXED KEY (same as backend account)
 const stripeKey =

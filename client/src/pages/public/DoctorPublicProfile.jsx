@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 import PublicNavbar from "../../components/PublicNavbar";
+import { useAuth } from "../../context/AuthContext";
 
 const money = (value) => {
   const n = Number(value);
@@ -18,6 +19,8 @@ const formatDateHeading = (key) => {
 export default function DoctorPublicProfile() {
   const { doctorId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const initialDate = searchParams.get("date") || "";
 
   const [loading, setLoading] = useState(true);
@@ -59,6 +62,30 @@ export default function DoctorPublicProfile() {
     };
     loadSlots();
   }, [doctorId, date]);
+
+  const handleBook = (slot) => {
+    if (!user) {
+      alert("Please log in as a patient to continue booking.");
+      navigate("/login");
+      return;
+    }
+
+    if (user.role !== "patient") {
+      alert("Booking is available only for patient accounts.");
+      return;
+    }
+
+    navigate("/patient/add-appointment", {
+      state: {
+        doctorId,
+        doctorName: doctor?.name || "",
+        specialization: doctor?.specialization || "",
+        appointmentDate: date,
+        appointmentTime: slot?.startTime || "",
+        notes: "",
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -165,7 +192,7 @@ export default function DoctorPublicProfile() {
                         <button
                           type="button"
                           className="px-4 py-2 rounded-xl bg-[#001836] bg-gradient-to-br from-[#001836] to-[#002d5b] text-white text-xs font-extrabold shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-transform"
-                          onClick={() => alert("Booking flow is not implemented yet (appointment-service).")}
+                          onClick={() => handleBook(s)}
                         >
                           Book
                         </button>

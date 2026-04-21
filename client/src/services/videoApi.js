@@ -1,10 +1,10 @@
 import axios from 'axios';
 
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000';
 
 const videoApi = axios.create({
-  baseURL: 'http://localhost:3000/video', // Changed to go through the gateway
-
-
+  baseURL: `${API_BASE_URL.replace(/\/$/, '')}/video`,
 });
 
 // Auto attach token to every request

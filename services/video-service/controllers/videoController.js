@@ -5,6 +5,25 @@ const path = require('path');
 const VideoSession = require('../models/VideoSession');
 
 const SESSION_TTL_MS = 60 * 60 * 1000;
+const normalizeBaseUrl = (value) => String(value || '').trim().replace(/\/$/, '');
+
+const appointmentServiceBases = () => {
+  const envBase = normalizeBaseUrl(process.env.APPOINTMENT_SERVICE_URL);
+  return [
+    ...new Set(
+      [envBase, 'http://appointment-service:3003', 'http://localhost:3003'].filter(Boolean)
+    )
+  ];
+};
+
+const doctorServiceBases = () => {
+  const envBase = normalizeBaseUrl(process.env.DOCTOR_SERVICE_URL);
+  return [
+    ...new Set(
+      [envBase, 'http://doctor-service:3002', 'http://localhost:3002'].filter(Boolean)
+    )
+  ];
+};
 
 function buildRoomName(appointmentId) {
   // Deterministic room name based strictly on appointment ID to ensure all parties join the same meeting
@@ -24,23 +43,26 @@ async function resolveRequesterIds(req) {
   let activeDoctorProfileId = null;
 
   if (role === 'doctor') {
-    try {
-      // Use local DNS or localhost for inter-service communication
-      const DOCTOR_SERVICE_URL = process.env.DOCTOR_SERVICE_URL || 'http://localhost:3002';
-      
-      const resp = await axios.get(`${DOCTOR_SERVICE_URL}/profile`, {
-        headers: {
-          'x-user-id': req.headers['x-user-id'] || requesterId,
-          'x-user-role': req.headers['x-user-role'] || 'doctor',
-          'Authorization': req.headers['authorization']
-        },
-        timeout: 2000 // Fast fail for inter-service calls
-      });
+    for (const baseUrl of doctorServiceBases()) {
+      try {
+        const resp = await axios.get(`${baseUrl}/profile`, {
+          headers: {
+            'x-user-id': req.headers['x-user-id'] || requesterId,
+            'x-user-role': req.headers['x-user-role'] || 'doctor',
+            'Authorization': req.headers['authorization']
+          },
+          timeout: 2000
+        });
 
-      const doctorData = resp.data?.doctor || resp.data;
-      activeDoctorProfileId = doctorData?._id ? String(doctorData._id) : null;
-    } catch (err) {
-      console.warn(`[Video] resolveRequesterIds: Could not resolve doctor profile (${err.message}). Falling back to Auth ID.`);
+        const doctorData = resp.data?.doctor || resp.data;
+        activeDoctorProfileId = doctorData?._id ? String(doctorData._id) : null;
+        break;
+      } catch (err) {
+        console.warn(`[Video] resolveRequesterIds: doctor profile lookup failed via ${baseUrl} (${err.message})`);
+      }
+    }
+    if (!activeDoctorProfileId) {
+      console.warn('[Video] resolveRequesterIds: Falling back to Auth user ID for doctor matching.');
     }
   }
 
@@ -254,14 +276,20 @@ exports.getOrCreateSessionByAppointment = async (req, res) => {
     }
 
     // 2. No session exists, fetch appointment details to verify and auto-create
-    const APPOINTMENT_SERVICE_URL = process.env.APPOINTMENT_SERVICE_URL || 'http://localhost:3003';
-    
     let appointment;
-    try {
-      const resp = await axios.get(`${APPOINTMENT_SERVICE_URL}/appointments/getappointmentbyid/${appointmentId}`);
-      appointment = resp.data.appointment;
-    } catch (err) {
-      console.error('Failed to fetch appointment:', err.message);
+    let fetched = false;
+    for (const baseUrl of appointmentServiceBases()) {
+      try {
+        const resp = await axios.get(`${baseUrl}/appointments/getappointmentbyid/${appointmentId}`, { timeout: 3000 });
+        appointment = resp.data?.appointment;
+        fetched = true;
+        break;
+      } catch (err) {
+        console.warn(`[Video] Failed to fetch appointment via ${baseUrl}:`, err.message);
+      }
+    }
+
+    if (!fetched) {
       return res.status(404).json({ error: 'Appointment not found or appointment service unavailable' });
     }
 

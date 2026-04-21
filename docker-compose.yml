@@ -126,12 +126,13 @@ services:
     build:
       context: ./services/Payment-service
     container_name: payment-service
+    env_file:
+      - ./services/Payment-service/.env
     ports:
       - "3104:3004"
     environment:
       PORT: 3004
       MONGO_URI: mongodb://mongo:27017/paymentdb
-      STRIPE_SECRET_KEY: change-me-stripe-secret
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
       DOCTOR_SERVICE_URL: http://doctor-service:3002
       NOTIFICATION_SERVICE_URL: http://notification-service:3005
@@ -152,6 +153,8 @@ services:
   video-service:
     build:
       context: ./services/video-service
+    env_file:
+      - ./services/video-service/.env
     container_name: video-service
     ports:
       - "3106:3006"
@@ -159,6 +162,8 @@ services:
       PORT: 3006
       MONGO_URI: mongodb://mongo:27017/videodb
       JWT_SECRET: change-me-jwt-secret
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3003
+      DOCTOR_SERVICE_URL: http://doctor-service:3002
     depends_on:
       mongo:
         condition: service_healthy

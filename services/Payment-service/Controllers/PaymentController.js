@@ -1,10 +1,25 @@
 const Payment = require("../Models/PaymentModel");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const axios = require("axios");
+
+const getStripeClient = () => {
+  const secretKey = String(process.env.STRIPE_SECRET_KEY || "").trim();
+  const looksLikePlaceholder = !secretKey || /^change-me/i.test(secretKey);
+
+  if (looksLikePlaceholder) {
+    const err = new Error(
+      "Payment service is not configured with a valid STRIPE_SECRET_KEY."
+    );
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return require("stripe")(secretKey);
+};
 
 // Create Payment Intent
 const createPayment = async (req, res) => {
   try {
+    const stripe = getStripeClient();
     const { appointmentId } = req.body;
 
     if (!appointmentId) {
