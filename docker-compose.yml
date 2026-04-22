@@ -21,7 +21,7 @@ services:
       - "3100:3000"
     environment:
       PORT: 3000
-      MONGO_URI: mongodb://mongo:27017/authdb
+      MONGO_URI: ${API_GATEWAY_MONGO_URI}
       JWT_SECRET: change-me-jwt-secret
       PATIENT_SERVICE_URL: http://patient-service:3001
       DOCTOR_SERVICE_URL: http://doctor-service:3002
@@ -62,7 +62,7 @@ services:
       - "3101:3001"
     environment:
       PORT: 3001
-      MONGO_URI: mongodb://mongo:27017/patientdb
+      MONGO_URI: ${PATIENT_MONGO_URI}
       JWT_SECRET: change-me-jwt-secret
       DOCTOR_SERVICE_URL: http://doctor-service:3002
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
@@ -84,11 +84,12 @@ services:
       - "3102:3002"
     environment:
       PORT: 3002
-      MONGO_URI: mongodb://mongo:27017/doctordb
+      MONGO_URI: ${DOCTOR_MONGO_URI}
       JWT_SECRET: change-me-jwt-secret
       EMAIL_USER: change-me-email-user
       EMAIL_PASS: change-me-email-pass
       ADMIN_EMAIL: admin@example.com
+      GROQ_API_KEY: ${GROQ_API_KEY}
     depends_on:
       mongo:
         condition: service_healthy
@@ -107,7 +108,7 @@ services:
       - "3103:3003"
     environment:
       PORT: 3003
-      MONGO_URI: mongodb://mongo:27017/appointmentdb
+      MONGO_URI: ${APPOINTMENT_MONGO_URI}
       DOCTOR_SERVICE_URL: http://doctor-service:3002
       NOTIFICATION_SERVICE_URL: http://notification-service:3005
     depends_on:
@@ -132,7 +133,7 @@ services:
       - "3104:3004"
     environment:
       PORT: 3004
-      MONGO_URI: mongodb://mongo:27017/paymentdb
+      MONGO_URI: ${PAYMENT_MONGO_URI}
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
       DOCTOR_SERVICE_URL: http://doctor-service:3002
       NOTIFICATION_SERVICE_URL: http://notification-service:3005
@@ -160,7 +161,7 @@ services:
       - "3106:3006"
     environment:
       PORT: 3006
-      MONGO_URI: mongodb://mongo:27017/videodb
+      MONGO_URI: ${VIDEO_MONGO_URI}
       JWT_SECRET: change-me-jwt-secret
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
       DOCTOR_SERVICE_URL: http://doctor-service:3002
@@ -199,7 +200,7 @@ services:
       - "3105:3005"
     environment:
       PORT: 3005
-      MONGO_URI: mongodb://mongo:27017/notificationdb
+      MONGO_URI: ${NOTIFICATION_MONGO_URI}
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
       EMAIL_USER: change-me-email-user
       EMAIL_PASS: change-me-email-pass
