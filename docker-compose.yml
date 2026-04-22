@@ -196,15 +196,15 @@ services:
     build:
       context: ./services/notification-service
     container_name: notification-service
+    env_file:
+      - ./services/notification-service/.env
     ports:
       - "3105:3005"
     environment:
       PORT: 3005
       MONGO_URI: ${NOTIFICATION_MONGO_URI}
       APPOINTMENT_SERVICE_URL: http://appointment-service:3003
-      EMAIL_USER: change-me-email-user
-      EMAIL_PASS: change-me-email-pass
-      EMAIL_FROM: no-reply@example.com
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@example.com}
     depends_on:
       mongo:
         condition: service_healthy
