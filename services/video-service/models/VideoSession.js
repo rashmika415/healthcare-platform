@@ -8,7 +8,8 @@ const videoSessionSchema = new mongoose.Schema({
   },
   appointmentId: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   },
   patientUserId: {
     type: String,

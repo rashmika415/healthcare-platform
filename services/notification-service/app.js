@@ -3,25 +3,36 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
+const { startReminderScheduler } = require("./Services/reminderScheduler");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Health check route
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'notification-service' });
+// Health check routes
+app.get("/", (req, res) => {
+  res.json({ status: "ok", service: "notification-service" });
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "notification-service" });
 });
 
 const notificationRoutes = require("./Routes/NotificationRoutes");
 
 app.use("/notifications", notificationRoutes);
 
-mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log("Notification DB Connected"))
-.catch(err => console.log(err));
+const PORT = Number(process.env.PORT) || 3005;
 
-app.listen(process.env.PORT, () => {
-    console.log(`Notification Service running on ${process.env.PORT}`);
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("Notification DB Connected");
+    startReminderScheduler();
+  })
+  .catch((err) => console.log(err));
+
+app.listen(PORT, () => {
+  console.log(`Notification Service running on ${PORT}`);
 });

@@ -10,7 +10,8 @@ const navItems = [
   { path: '/video/hub', icon: 'VC', label: 'Consultations' },
   { path: '/patient/reports', icon: 'RP', label: 'Reports' },
   { path: '/patient/prescriptions', icon: 'PR', label: 'Prescriptions' },
-  { path: '/patient/history', icon: 'MH', label: 'Medical-History' }
+  { path: '/patient/history', icon: 'MH', label: 'Medical-History' },
+  { path: '/patient/symptom-checker', icon: 'AI', label: 'Symptom Checker' }
 ];
 
 export default function PatientLayout({

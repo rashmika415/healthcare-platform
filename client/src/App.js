@@ -12,11 +12,15 @@ import Register     from './pages/public/Register';
 import AppointmentSearch from './pages/public/AppointmentSearch';
 import AppointmentResults from './pages/public/AppointmentResults';
 import DoctorPublicProfile from './pages/public/DoctorPublicProfile';
+import Telemedicine from './pages/public/Telemedicine';
+import Contact from './pages/public/Contact';
+import HealthRecords from './pages/public/HealthRecords';
 
 import AdminDashboard    from './pages/admin/AdminDashboard';
 import AdminDoctors      from './pages/admin/AdminDoctors';
 import AdminPatients     from './pages/admin/AdminPatients';
 import AdminVideoSessions from './pages/admin/AdminVideoSessions';
+import AdminTransactions from './pages/admin/AdminTransactions';
 
 // // Patient pages
 import PatientSetup         from './pages/patient/Patientsetupandprofile';
@@ -24,6 +28,7 @@ import { PatientProfile }   from './pages/patient/Patientsetupandprofile';
 import PatientDashboard     from './pages/patient/PatientDashboard';
 import PatientReports       from './pages/patient/Patientreports';
 import PatientPrescriptions from './pages/patient/Patientprescriptionsandhistory';
+import SymptomChecker       from './pages/patient/SymptomChecker';
 import { PatientHistory }   from './pages/patient/Patientprescriptionsandhistory';
 //import PatientAppointments  from './pages/patient/PatientAppointments';
 
@@ -66,27 +71,29 @@ export default function App() {
           <Route path="/appointments" element={<AppointmentSearch />} />
           <Route path="/appointments/results" element={<AppointmentResults />} />
           <Route path="/doctors/:doctorId" element={<DoctorPublicProfile />} />
+          <Route path="/telemedicine" element={<Telemedicine />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/health-records" element={<HealthRecords />} />
 
-<Route path="/admin/dashboard" element={
-  <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
-} />
-<Route path="/admin/doctors" element={
-  <PrivateRoute role="admin"><AdminDoctors /></PrivateRoute>
-} />
-<Route path="/admin/patients" element={
-  <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
-} /><Route path="/admin/dashboard" element={
-  <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
-} />
-<Route path="/admin/doctors" element={
-  <PrivateRoute role="admin"><AdminDoctors /></PrivateRoute>
-} />
-<Route path="/admin/patients" element={
-  <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
-} />
-<Route path="/admin/video" element={
-  <PrivateRoute role="admin"><AdminVideoSessions /></PrivateRoute>
-} />
+          {/* ── Admin ────────────────────────────── */}
+          <Route path="/admin/dashboard" element={
+            <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
+          } />
+          <Route path="/admin/doctors" element={
+            <PrivateRoute role="admin"><AdminDoctors /></PrivateRoute>
+          } />
+          <Route path="/admin/patients" element={
+            <PrivateRoute role="admin"><AdminPatients /></PrivateRoute>
+          } />
+          <Route path="/admin/appointments" element={
+            <PrivateRoute role="admin"><AdminAppointments /></PrivateRoute>
+          } />
+          <Route path="/admin/video" element={
+            <PrivateRoute role="admin"><AdminVideoSessions /></PrivateRoute>
+          } />
+          <Route path="/admin/transactions" element={
+            <PrivateRoute role="admin"><AdminTransactions /></PrivateRoute>
+          } />
 
           {/* ── Patient ──────────────────────────── */}
           {/* ── Patient routes ── */}
@@ -112,6 +119,10 @@ export default function App() {
 
 <Route path="/patient/history" element={
   <PrivateRoute role="patient"><PatientHistory /></PrivateRoute>
+} />
+
+<Route path="/patient/symptom-checker" element={
+  <PrivateRoute role="patient"><SymptomChecker /></PrivateRoute>
 } />
 
 {/* <Route path="/patient/appointments" element={
@@ -181,14 +192,6 @@ export default function App() {
                 </PrivateRoute>
               }
             />
-
-          {/* ── Admin ────────────────────────────── */}
-          {/*
-          <Route path="/admin/dashboard" element={
-            <PrivateRoute role="admin"><AdminDashboard /></PrivateRoute>
-          }/>
-          */}
-          <Route path="/admin/appointments" element={<AdminAppointments />} />
 
           {/* ── Catch all ────────────────────────── */}
           <Route path="*" element={<Navigate to="/" />} />

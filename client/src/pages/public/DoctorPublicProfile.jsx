@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
+import PublicNavbar from "../../components/PublicNavbar";
+import { useAuth } from "../../context/AuthContext";
 
 const money = (value) => {
   const n = Number(value);
@@ -17,6 +19,8 @@ const formatDateHeading = (key) => {
 export default function DoctorPublicProfile() {
   const { doctorId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const initialDate = searchParams.get("date") || "";
 
   const [loading, setLoading] = useState(true);
@@ -59,10 +63,35 @@ export default function DoctorPublicProfile() {
     loadSlots();
   }, [doctorId, date]);
 
+  const handleBook = (slot) => {
+    if (!user) {
+      alert("Please log in as a patient to continue booking.");
+      navigate("/login");
+      return;
+    }
+
+    if (user.role !== "patient") {
+      alert("Booking is available only for patient accounts.");
+      return;
+    }
+
+    navigate("/patient/add-appointment", {
+      state: {
+        doctorId,
+        doctorName: doctor?.name || "",
+        specialization: doctor?.specialization || "",
+        appointmentDate: date,
+        appointmentTime: slot?.startTime || "",
+        notes: "",
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <PublicNavbar />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(circle_at_15%_20%,rgba(147,197,253,0.35),transparent_38%),radial-gradient(circle_at_88%_14%,rgba(30,64,175,0.2),transparent_30%)]" />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-14">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-14">
         <div className="relative flex items-center justify-between gap-4 mb-5">
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -163,7 +192,7 @@ export default function DoctorPublicProfile() {
                         <button
                           type="button"
                           className="px-4 py-2 rounded-xl bg-[#001836] bg-gradient-to-br from-[#001836] to-[#002d5b] text-white text-xs font-extrabold shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-transform"
-                          onClick={() => alert("Booking flow is not implemented yet (appointment-service).")}
+                          onClick={() => handleBook(s)}
                         >
                           Book
                         </button>

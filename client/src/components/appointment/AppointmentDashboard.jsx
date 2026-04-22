@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import PatientLayout from "../../pages/patient/Patientlayout ";
+import { useNavigate } from "react-router-dom";
 
 /** Strip trailing slash and accidental `/appointments` so env can be service root or full prefix */
 function normalizeAppointmentBaseUrl(raw) {
@@ -82,8 +83,46 @@ function getStatusBadge(status) {
   return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
 }
 
+function getJourneyStep(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (['completed'].includes(normalized)) return 3;
+  if (['in_call', 'in-call', 'inprogress', 'in-progress', 'ongoing'].includes(normalized)) return 2;
+  if (['confirmed', 'accepted'].includes(normalized)) return 1;
+  return 0;
+}
+
+function JourneySteps({ status }) {
+  const labels = ['Booked', 'Confirmed', 'In Call', 'Completed'];
+  const currentStep = getJourneyStep(status);
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2">Progress</p>
+      <div className="grid grid-cols-4 gap-2">
+        {labels.map((label, idx) => (
+          <div key={label} className="flex items-center gap-2">
+            <span
+              className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                idx <= currentStep
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-slate-500 ring-1 ring-slate-300'
+              }`}
+            >
+              {idx + 1}
+            </span>
+            <span className={`text-[11px] font-semibold ${idx <= currentStep ? 'text-blue-700' : 'text-slate-500'}`}>
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AppointmentDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -263,6 +302,12 @@ function AppointmentDashboard() {
     alert("Failed to cancel appointment");
   };
 
+  const handleGoToPayment = (appointmentId) => {
+    navigate("/payment", {
+      state: { appointmentId },
+    });
+  };
+
   return (
     <PatientLayout title="Appointments" subtitle="View all your medical appointments">
       <div className="flex flex-col gap-6">
@@ -415,14 +460,26 @@ function AppointmentDashboard() {
                         </div>
 
                         <div className="mt-4">
-                          {appointment.status !== "CANCELLED" && (
-                            <button
-                              onClick={() => handleCancelAppointment(appointment._id)}
-                              className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition"
-                            >
-                              Cancel
-                            </button>
-                          )}
+                          <div className="flex flex-wrap items-center gap-3">
+                            {String(appointment.paymentStatus || "").toUpperCase() === "PENDING" &&
+                              appointment.status !== "CANCELLED" && (
+                                <button
+                                  onClick={() => handleGoToPayment(appointment._id)}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                                >
+                                  Payment
+                                </button>
+                              )}
+                            {appointment.status !== "CANCELLED" && (
+                              <button
+                                onClick={() => handleCancelAppointment(appointment._id)}
+                                className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </div>
+                          <JourneySteps status={appointment.status} />
                         </div>
                       </div>
                     </div>

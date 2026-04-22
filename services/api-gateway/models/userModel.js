@@ -24,9 +24,35 @@ const userSchema = new mongoose.Schema(
       enum: ['patient', 'doctor', 'admin'],
       default: 'patient'
     },
+    // Account lifecycle (admin can disable any account)
+    isActive: {
+      type: Boolean,
+      default: true
+    },
     isVerified: {
       type: Boolean,
       default: false   // admin will verify doctors later
+    },
+    // Doctor registration workflow:
+    // - doctors start as "pending" and must be approved by admin
+    // - patients/admins are treated as "verified" for this workflow
+    verificationStatus: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
+      default: 'verified'
+    },
+    verificationRejectedReason: {
+      type: String,
+      default: null,
+      trim: true
+    },
+    verificationDecidedAt: {
+      type: Date,
+      default: null
+    },
+    verificationDecidedBy: {
+      type: String,
+      default: null
     }
   },
   { timestamps: true } // adds createdAt and updatedAt automatically

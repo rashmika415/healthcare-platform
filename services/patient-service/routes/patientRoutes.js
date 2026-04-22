@@ -15,6 +15,7 @@ router.put('/profile',   c.updateProfile);   // update my profile
 router.get('/prescriptions', c.getPrescriptions);  // view prescriptions
 router.get('/history',       c.getMedicalHistory); // view history
 router.get('/medical-history', c.getMedicalHistoryOverview); // aggregated timeline
+router.get('/smart-summary', c.getSmartMedicalSummary); // patient-friendly summary
 
 router.get('/emails',        c.getAllPatientEmails); // get all patient emails for dropdown
 

@@ -1,10 +1,13 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    // Google App Passwords are often stored with spaces; nodemailer expects no spaces.
+    pass: String(process.env.EMAIL_PASS || '').replace(/\s+/g, '')
   }
 });
 

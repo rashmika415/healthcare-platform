@@ -2,6 +2,7 @@ const express   = require('express');
 const mongoose  = require('mongoose');
 const cors      = require('cors');
 const helmet    = require('helmet');
+const axios     = require('axios');
 
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 require('dotenv').config();
@@ -240,9 +241,57 @@ app.use('/video',
   })
 );
 
+app.use('/ai-symptom',
+  authMiddleware,
+  createProxyMiddleware({
+    target: process.env.AI_SYMPTOM_SERVICE_URL || 'http://localhost:3007',
+    changeOrigin: true,
+    pathRewrite: (path) => `/symptom-checker${path}`,
+    proxyTimeout: 15000,
+    timeout: 15000,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        forwardUserHeaders(proxyReq, req);
+        fixRequestBody(proxyReq, req, res);
+      },
+      error: (err, req, res) => {
+        console.error('Proxy error (ai-symptom):', err);
+        if (!res.headersSent) {
+          res.status(503).json({ error: 'AI symptom service unavailable', details: err.message });
+        }
+      }
+    }
+  })
+);
+
 
 // Parse request body for routes that are handled inside gateway.
 app.use(express.json());
+
+// ── Public "Contact us" (stored via notification-service) ─────────────
+app.post('/contact', async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body || {};
+
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const url = `${process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3005'}/notifications/create`;
+    const payload = {
+      patientId: null,
+      appointmentId: null,
+      type: 'CONTACT',
+      message: `From: ${name} <${email}>\nSubject: ${subject}\n\n${message}`
+    };
+
+    const r = await axios.post(url, payload, { timeout: 15000 });
+    return res.status(201).json({ status: 'ok', id: r.data?._id });
+  } catch (err) {
+    console.error('contact error:', err.message);
+    return res.status(503).json({ error: 'Contact service unavailable' });
+  }
+});
 
 app.use('/auth', authRoutes);
 app.use('/admin', adminRoutes);

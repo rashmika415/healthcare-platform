@@ -8,6 +8,38 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:300
 function AddAppointment() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const toInputDate = (value) => {
+    if (!value) return "";
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const toInputTime = (value) => {
+    if (!value) return "";
+    if (typeof value === "string" && /^\d{2}:\d{2}$/.test(value)) return value;
+    const str = String(value).trim();
+    const twelveHourMatch = str.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+    if (twelveHourMatch) {
+      let hour = Number(twelveHourMatch[1]);
+      const minute = twelveHourMatch[2];
+      const meridiem = twelveHourMatch[3].toUpperCase();
+      if (meridiem === "PM" && hour < 12) hour += 12;
+      if (meridiem === "AM" && hour === 12) hour = 0;
+      return `${String(hour).padStart(2, "0")}:${minute}`;
+    }
+    const dateParse = new Date(`1970-01-01T${str}`);
+    if (!Number.isNaN(dateParse.getTime())) {
+      const h = String(dateParse.getHours()).padStart(2, "0");
+      const m = String(dateParse.getMinutes()).padStart(2, "0");
+      return `${h}:${m}`;
+    }
+    return "";
+  };
 
   const [formData, setFormData] = useState({
     patientId: "",
@@ -56,6 +88,7 @@ function AddAppointment() {
       specialization,
       appointmentDate,
       appointmentTime,
+      notes,
     } = location.state;
 
     setFormData((prev) => ({
@@ -63,9 +96,52 @@ function AddAppointment() {
       doctorId: doctorId || prev.doctorId,
       doctorName: doctorName || prev.doctorName,
       specialization: specialization || prev.specialization,
-      date: appointmentDate || prev.date,
-      time: appointmentTime || prev.time,
+      date: toInputDate(appointmentDate) || prev.date,
+      time: toInputTime(appointmentTime) || prev.time,
+      notes: (notes !== undefined && notes !== null && String(notes).trim())
+        ? String(notes).trim()
+        : prev.notes,
     }));
+  }, [location.state]);
+
+  // If book navigation didn't provide a usable date/time, fetch doctor's next available slot.
+  useEffect(() => {
+    const loadDoctorAvailability = async () => {
+      const selectedDoctorId = location.state?.doctorId;
+      if (!selectedDoctorId) return;
+
+      const hasDate = Boolean(toInputDate(location.state?.appointmentDate));
+      const hasTime = Boolean(toInputTime(location.state?.appointmentTime));
+      if (hasDate && hasTime) return;
+
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/doctor/availability/${selectedDoctorId}`
+        );
+        const activeSlots = (res.data?.availability || []).filter((slot) => slot?.isActive);
+        if (activeSlots.length === 0) return;
+
+        const sortedSlots = activeSlots
+          .slice()
+          .sort((a, b) => {
+            const aDate = new Date(a.date).getTime();
+            const bDate = new Date(b.date).getTime();
+            if (aDate !== bDate) return aDate - bDate;
+            return String(a.startTime || "").localeCompare(String(b.startTime || ""));
+          });
+
+        const nextSlot = sortedSlots[0];
+        setFormData((prev) => ({
+          ...prev,
+          date: prev.date || toInputDate(nextSlot?.date),
+          time: prev.time || toInputTime(nextSlot?.startTime),
+        }));
+      } catch (error) {
+        console.error("Error fetching doctor availability:", error);
+      }
+    };
+
+    loadDoctorAvailability();
   }, [location.state]);
 
   const handleChange = (e) => {

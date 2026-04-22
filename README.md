@@ -27,12 +27,57 @@ This project is built as a distributed healthcare solution using multiple backen
 ## Features
 
 - Authentication and role-based access control
+- Admin panel: manage users, approve/reject doctors, monitor operations and transactions
 - Patient profile and medical workflows
 - Doctor profile and availability management
 - Appointment booking and appointment history
 - Payment processing workflow
 - Video consultation support
+- AI symptom checker with specialty recommendations
 - Centralized routing through API gateway
+
+## Admin Role (Fully Implemented)
+
+Admin capabilities:
+
+- **Manage user accounts**: list users, activate/deactivate accounts, delete users
+- **Verify doctor registrations**: approve (verify) or reject doctor signups with a reason
+- **Oversee platform operations**: view all appointments and active video sessions
+- **Oversee financial transactions**: view all payment records
+
+Admin login (Docker Compose default):
+
+- **Email**: `admin@healthcare.com`
+- **Password**: `admin123`
+
+Create the seed admin (first time only):
+
+```bash
+cd services/api-gateway
+npm install
+node seedAdmin.js
+```
+
+Admin UI pages (client routes):
+
+- `/admin/dashboard`
+- `/admin/doctors`
+- `/admin/patients`
+- `/admin/appointments`
+- `/admin/video`
+- `/admin/transactions`
+
+Admin API endpoints (API Gateway):
+
+- `GET /admin/users`
+- `PUT /admin/activate/:id`
+- `PUT /admin/deactivate/:id`
+- `DELETE /admin/users/:id`
+- `PUT /admin/verify-doctor/:id`
+- `PUT /admin/reject-doctor/:id` (body: `{ "reason": "..." }`)
+- `GET /admin/stats`
+- `GET /admin/appointments`
+- `GET /admin/transactions`
 
 ## System Architecture
 
@@ -50,10 +95,11 @@ Core services:
 - Appointment Service
 - Payment Service
 - Video Service
+- AI Symptom Service
 - MongoDB
 - React Client
 
-Note: A notification service exists in the repository, but it is not part of the current Docker Compose deployment file.
+Note: The notification service is included in the Docker Compose stack.
 
 ## Tech Stack
 
@@ -72,6 +118,7 @@ Note: A notification service exists in the repository, but it is not part of the
 - services/apponment-service: Appointment-related APIs
 - services/Payment-service: Payment-related APIs
 - services/video-service: Video consultation APIs
+- services/ai-symptom-service: AI symptom analysis and specialty recommendation APIs
 - services/notification-service: Notification service code (not in Compose stack)
 - k8s: Kubernetes deployment manifests and scripts
 - bridge: Additional Kubernetes overlay resources
@@ -101,6 +148,7 @@ Important environment values:
 - CLOUDINARY_CLOUD_NAME
 - CLOUDINARY_API_KEY
 - CLOUDINARY_API_SECRET
+- GEMINI_API_KEY (optional, for LLM-powered symptom analysis via Google Gemini)
 
 Project-specific notes:
 
@@ -120,6 +168,7 @@ Project-specific notes:
 - Payment Service: http://localhost:3104
 - Notification Service: http://localhost:3005
 - Video Service: http://localhost:3106
+- AI Symptom Service: http://localhost:3107
 - MongoDB: localhost:27018
 
 ### Internal container ports
@@ -131,6 +180,7 @@ Project-specific notes:
 - Payment Service: 3004
 - Notification Service: 3005
 - Video Service: 3006
+- AI Symptom Service: 3007
 - MongoDB: 27017
 
 ## Deployment with Docker Compose

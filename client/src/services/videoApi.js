@@ -1,10 +1,10 @@
 import axios from 'axios';
 
+const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000';
 
 const videoApi = axios.create({
-  baseURL: 'http://localhost:3000/video', // Changed to go through the gateway
-
-
+  baseURL: `${API_BASE_URL.replace(/\/$/, '')}/video`,
 });
 
 // Auto attach token to every request
@@ -29,6 +29,14 @@ export const getOrCreateSessionByAppointment = async (appointmentId) => {
  */
 export const joinSession = async (sessionId, participantToken) => {
   const response = await videoApi.post(`/sessions/${sessionId}/join`, { participantToken });
+  return response.data;
+};
+
+/**
+ * Participant: Delete consultation session for an appointment
+ */
+export const deleteSessionByAppointment = async (appointmentId) => {
+  const response = await videoApi.delete(`/appointment/${appointmentId}`);
   return response.data;
 };
 

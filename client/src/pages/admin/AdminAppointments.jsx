@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import axios from "axios";
-
-const API_BASE =
-  process.env.REACT_APP_APPOINTMENT_URL?.replace(/\/$/, "") ||
-  "http://localhost:3003";
+import api from "../../services/api";
 
 export default function AdminAppointments() {
   const { user, logout } = useAuth();
@@ -20,7 +16,7 @@ export default function AdminAppointments() {
 
   const fetchAppointments = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/appointments/getallappointments`);
+      const res = await api.get(`/admin/appointments`);
       setAppointments(res.data?.appointments || []);
     } catch (error) {
       console.error("Error fetching appointments:", error);
@@ -33,6 +29,57 @@ export default function AdminAppointments() {
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  const escapeCsv = (value) => {
+    const str = value === null || value === undefined ? "" : String(value);
+    const escaped = str.replace(/"/g, '""');
+    return `"${escaped}"`;
+  };
+
+  const handleDownloadReport = () => {
+    if (!appointments.length) return;
+
+    const headers = [
+      "Appointment ID",
+      "Patient Name",
+      "Patient Email",
+      "Patient ID",
+      "Doctor Name",
+      "Doctor ID",
+      "Specialization",
+      "Date",
+      "Time",
+      "Status",
+      "Payment Status",
+      "Notes",
+    ];
+
+    const rows = appointments.map((appointment) => [
+      appointment._id,
+      appointment.patientName,
+      appointment.patientEmail || "N/A",
+      appointment.patientId,
+      appointment.doctorName,
+      appointment.doctorId,
+      appointment.specialization,
+      appointment.date,
+      appointment.time,
+      appointment.status || "BOOKED",
+      appointment.paymentStatus || "PENDING",
+      appointment.notes || "",
+    ]);
+
+    const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `appointments-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const badgeStyle = (value) => {
@@ -124,8 +171,23 @@ export default function AdminAppointments() {
         ) : (
           <div style={s.card}>
             <div style={s.cardHeader}>
-              <h2 style={s.cardTitle}>All Appointments</h2>
-              <p style={s.cardSub}>{appointments.length} records found</p>
+              <div style={s.cardHeaderTop}>
+                <div>
+                  <h2 style={s.cardTitle}>All Appointments</h2>
+                  <p style={s.cardSub}>{appointments.length} records found</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  disabled={!appointments.length}
+                  style={{
+                    ...s.downloadBtn,
+                    ...(appointments.length ? {} : s.downloadBtnDisabled),
+                  }}
+                >
+                  Download Report
+                </button>
+              </div>
             </div>
 
             {appointments.length === 0 ? (
@@ -196,8 +258,23 @@ const s = {
   msg: { color: "#7a92aa", fontSize: 14 },
   card: { background: "#fff", borderRadius: 14, border: "1px solid #e4ecf7", overflow: "hidden" },
   cardHeader: { padding: 22, borderBottom: "1px solid #e4ecf7", background: "#f8fbff" },
+  cardHeaderTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
   cardTitle: { margin: 0, fontSize: 20, color: "#0b1f3a" },
   cardSub: { margin: "6px 0 0", fontSize: 13, color: "#7a92aa" },
+  downloadBtn: {
+    border: "none",
+    borderRadius: 10,
+    background: "#2563eb",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    padding: "9px 14px",
+    cursor: "pointer",
+  },
+  downloadBtnDisabled: {
+    background: "#93c5fd",
+    cursor: "not-allowed",
+  },
   empty: { padding: 24, color: "#7a92aa" },
   list: { display: "flex", flexDirection: "column" },
   item: { padding: 22, borderBottom: "1px solid #eef3fa" },

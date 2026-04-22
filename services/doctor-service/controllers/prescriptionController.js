@@ -42,129 +42,16 @@ const buildDoctorOwnerFilter = (doctorUserIds) => {
 };
 
 // ── AI Suggestion Helpers ─────────────────────────────
-const FALLBACK_SUGGESTIONS = {
-  'common cold': {
-    medicines: [
-      {
-        name: 'Paracetamol 500mg',
-        dosage: '1 tablet',
-        duration: '3 days',
-        frequency: 'Twice daily',
-      },
-      {
-        name: 'Cough Syrup',
-        dosage: '10ml',
-        duration: '5 days',
-        frequency: 'Three times daily',
-      },
-    ],
-    instructions: 'Take after meals, drink warm fluids, and get adequate rest.',
-  },
-  cold: {
-    medicines: [
-      {
-        name: 'Paracetamol 500mg',
-        dosage: '1 tablet',
-        duration: '3 days',
-        frequency: 'Twice daily',
-      },
-      {
-        name: 'Cough Syrup',
-        dosage: '10ml',
-        duration: '5 days',
-        frequency: 'Three times daily',
-      },
-    ],
-    instructions: 'Take after meals, drink warm fluids, and get adequate rest.',
-  },
-  fever: {
-    medicines: [
-      {
-        name: 'Paracetamol 500mg',
-        dosage: '1 tablet',
-        duration: '3 days',
-        frequency: 'As needed',
-      },
-    ],
-    instructions: 'Take after meals and drink plenty of water.',
-  },
-  gastritis: {
-    medicines: [
-      {
-        name: 'Omeprazole 20mg',
-        dosage: '1 capsule',
-        duration: '5 days',
-        frequency: 'Once daily',
-      },
-    ],
-    instructions: 'Take before breakfast and avoid spicy food.',
-  },
-  gastric: {
-    medicines: [
-      {
-        name: 'Omeprazole 20mg',
-        dosage: '1 capsule',
-        duration: '5 days',
-        frequency: 'Once daily',
-      },
-    ],
-    instructions: 'Take before breakfast and avoid spicy food.',
-  },
-  migraine: {
-    medicines: [
-      {
-        name: 'Ibuprofen 400mg',
-        dosage: '1 tablet',
-        duration: '2 days',
-        frequency: 'Twice daily',
-      },
-    ],
-    instructions: 'Take after meals and rest in a quiet, dark room.',
-  },
-  headache: {
-    medicines: [
-      {
-        name: 'Ibuprofen 400mg',
-        dosage: '1 tablet',
-        duration: '2 days',
-        frequency: 'Twice daily',
-      },
-    ],
-    instructions: 'Take after meals and rest in a quiet, dark room.',
-  },
-  allergy: {
-    medicines: [
-      {
-        name: 'Cetirizine 10mg',
-        dosage: '1 tablet',
-        duration: '5 days',
-        frequency: 'Once daily',
-      },
-    ],
-    instructions: 'Take in the evening if it causes drowsiness.',
-  },
-  'minor infection': {
-    medicines: [
-      {
-        name: 'Azithromycin 500mg',
-        dosage: '1 tablet',
-        duration: '3 days',
-        frequency: 'Once daily',
-      },
-    ],
-    instructions: 'Take after meals and complete the full course.',
-  },
-  infection: {
-    medicines: [
-      {
-        name: 'Azithromycin 500mg',
-        dosage: '1 tablet',
-        duration: '3 days',
-        frequency: 'Once daily',
-      },
-    ],
-    instructions: 'Take after meals and complete the full course.',
-  },
+const AI_SUGGESTION_SCHEMA_EXAMPLE = {
+  medicines: [
+    {
+      name: 'string',
+      dosage: 'string',
+      duration: 'string',
+      frequency: 'Once daily | Twice daily | Three times daily | Four times daily | As needed',
+    },
+  ],
+  instructions: 'string',
 };
 
 const normalizeAiResponse = (data) => {
@@ -182,6 +69,14 @@ const normalizeAiResponse = (data) => {
     medicines = data.medicines;
   } else if (Array.isArray(data?.suggestions)) {
     medicines = data.suggestions;
+  } else if (Array.isArray(data?.medications)) {
+    medicines = data.medications;
+  } else if (Array.isArray(data?.drugs)) {
+    medicines = data.drugs;
+  } else if (Array.isArray(data?.items)) {
+    medicines = data.items;
+  } else if (Array.isArray(data?.prescription)) {
+    medicines = data.prescription;
   } else if (data?.medicine) {
     medicines = [
       {
@@ -210,22 +105,12 @@ const normalizeAiResponse = (data) => {
       (typeof data?.instructions === 'string' && data.instructions.trim()) ||
       (typeof data?.note === 'string' && data.note.trim()) ||
       (typeof data?.notes === 'string' && data.notes.trim()) ||
+      (typeof data?.instruction === 'string' && data.instruction.trim()) ||
       '',
   };
 };
 
 const getFallbackSuggestion = (diagnosis) => {
-  const key = String(diagnosis || '').trim().toLowerCase();
-
-  if (FALLBACK_SUGGESTIONS[key]) {
-    return FALLBACK_SUGGESTIONS[key];
-  }
-
-  const matchedKey = Object.keys(FALLBACK_SUGGESTIONS).find((k) => key.includes(k));
-  if (matchedKey) {
-    return FALLBACK_SUGGESTIONS[matchedKey];
-  }
-
   return {
     medicines: [
       {
@@ -235,7 +120,7 @@ const getFallbackSuggestion = (diagnosis) => {
         frequency: 'As needed',
       },
     ],
-    instructions: `No predefined suggestion found for "${diagnosis}". Please review and enter manually.`,
+    instructions: `AI suggestion is unavailable for "${diagnosis}". Please review and enter manually.`,
   };
 };
 
@@ -273,67 +158,98 @@ const extractJsonFromText = (text) => {
   return null;
 };
 
-const getAiSuggestionFromOpenAI = async ({ patientEmail, patientName, diagnosis }) => {
+const getAiSuggestionFromGroq = async ({ patientEmail, patientName, diagnosis }) => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error('GROQ_API_KEY is not configured');
   }
 
+  const model = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
   const client = new OpenAI({
     apiKey,
     baseURL: 'https://api.groq.com/openai/v1',
   });
 
-  const prompt = `
-You are assisting a doctor in drafting a digital prescription.
+  const system = [
+    'You are a clinical assistant helping a doctor draft a prescription suggestion from a diagnosis.',
+    'Return ONLY a single JSON object. No markdown. No explanation.',
+    'This is a draft suggestion for doctor review, not medical advice to the patient.',
+    'If the diagnosis is ambiguous/unsafe, return conservative symptomatic care and add clear instructions to re-evaluate.',
+    'Avoid antibiotics unless the diagnosis strongly indicates bacterial infection; never invent lab results.',
+  ].join(' ');
 
-Return ONLY valid JSON with this exact structure:
-{
-  "medicines": [
-    {
-      "name": "string",
-      "dosage": "string",
-      "duration": "string",
-      "frequency": "Once daily | Twice daily | Three times daily | Four times daily | As needed"
-    }
-  ],
-  "instructions": "string"
-}
-
-Rules:
-- Do not return markdown.
-- Do not return explanations.
-- Keep it short and practical.
-- This is only a draft suggestion for doctor review.
-- Make frequency exactly one of the allowed values.
-- Prefer realistic, diagnosis-specific suggestions.
-- If diagnosis is unclear, return one cautious medicine entry and a careful instruction.
-- Do not always return paracetamol unless it truly fits the diagnosis.
-
-Patient email: ${patientEmail || 'N/A'}
-Patient name: ${patientName || 'N/A'}
-Diagnosis: ${diagnosis}
-`;
-
-  const response = await client.chat.completions.create({
-    model: 'llama3-8b-8192',
-    messages: [
+  const makeUserPayload = (mode) =>
+    JSON.stringify(
       {
-        role: 'user',
-        content: prompt,
+        patient: {
+          email: patientEmail || 'N/A',
+          name: patientName || 'N/A',
+        },
+        diagnosis: String(diagnosis || '').trim(),
+        output_format_example: AI_SUGGESTION_SCHEMA_EXAMPLE,
+        constraints: {
+          allowed_frequencies: [
+            'Once daily',
+            'Twice daily',
+            'Three times daily',
+            'Four times daily',
+            'As needed',
+          ],
+          min_medicines: 1,
+          max_medicines: 5,
+          if_unsure_use: {
+            name: 'Doctor review required',
+            dosage: 'As directed',
+            duration: 'As directed',
+            frequency: 'As needed',
+          },
+          mode,
+        },
       },
-    ],
-    temperature: 0.3,
-  });
+      null,
+      2
+    );
 
-  const text = response?.choices?.[0]?.message?.content || '';
+  const tryOnce = async (temperature, mode) => {
+    const user = makeUserPayload(mode);
+    const request = {
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature,
+      max_tokens: 700,
+    };
 
-  const parsed = extractJsonFromText(text);
-  if (!parsed) {
-    throw new Error('Failed to parse AI JSON response');
+    let response;
+    try {
+      response = await client.chat.completions.create({
+        ...request,
+        response_format: { type: 'json_object' },
+      });
+    } catch (err) {
+      // Some models/providers reject response_format; retry without it.
+      response = await client.chat.completions.create(request);
+    }
+
+    const text = response?.choices?.[0]?.message?.content || '';
+    const parsed = extractJsonFromText(text);
+    if (!parsed) throw new Error('Failed to parse AI JSON response');
+    return parsed;
+  };
+
+  // Two-pass strategy:
+  // 1) Draft (creative but constrained)
+  // 2) Repair (ultra strict) if draft yields empty/invalid medicines
+  const draft = await tryOnce(0.2, 'draft');
+  const draftNormalized = normalizeAiResponse(draft);
+  if (Array.isArray(draftNormalized?.medicines) && draftNormalized.medicines.length > 0) {
+    return draft;
   }
 
-  return parsed;
+  const repaired = await tryOnce(0.0, 'repair');
+  return repaired;
 };
 
 // ── Create Prescription ───────────────────────────────
@@ -405,7 +321,7 @@ exports.generateAiSuggestion = async (req, res) => {
     let source = 'ai';
 
     try {
-      const aiData = await getAiSuggestionFromOpenAI({
+      const aiData = await getAiSuggestionFromGroq({
         patientEmail,
         patientName,
         diagnosis: String(diagnosis).trim(),
