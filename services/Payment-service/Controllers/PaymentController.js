@@ -89,12 +89,12 @@ const confirmPayment = async (req, res) => {
       return res.status(404).json({ error: "Payment not found" });
     }
 
-    if (payment.status === "PAID") {
-      return res.status(200).json({ message: "Payment already confirmed" });
-    }
+    const wasAlreadyPaid = payment.status === "PAID";
 
-    payment.status = "PAID";
-    await payment.save();
+    if (!wasAlreadyPaid) {
+      payment.status = "PAID";
+      await payment.save();
+    }
 
     // update appointment payment status
     await axios.put(
@@ -113,7 +113,7 @@ const confirmPayment = async (req, res) => {
     });
 
     res.status(200).json({
-      message: "Payment successful",
+      message: wasAlreadyPaid ? "Payment already confirmed" : "Payment successful",
     });
   } catch (error) {
     console.error("Confirm Payment Error:", error.message);

@@ -6,6 +6,8 @@ const { sendEmail } = require("../Services/emailService");
 const createNotification = async (req, res) => {
   try {
     const { patientId, appointmentId, type, message } = req.body;
+    let emailSent = null;
+    let emailError = null;
 
     // Save notification in DB
     const notification = await Notification.create({
@@ -17,6 +19,7 @@ const createNotification = async (req, res) => {
 
     // Send email only for payment success
     if (type === "PAYMENT") {
+      emailSent = false;
       try {
         // Fetch appointment details only
         const appointmentRes = await axios.get(
@@ -54,18 +57,25 @@ const createNotification = async (req, res) => {
             html
           });
 
+          emailSent = true;
           console.log("Email sent successfully to:", appointment.patientEmail);
         } else {
+          emailError = "No patientEmail found in appointment";
           console.log("No patientEmail found in appointment");
         }
-      } catch (emailError) {
-        console.error("Email/Fetch error status:", emailError.response?.status);
-        console.error("Email/Fetch error data:", emailError.response?.data);
-        console.error("Email/Fetch error message:", emailError.message);
+      } catch (err) {
+        emailError = err.response?.data?.error || err.message;
+        console.error("Email/Fetch error status:", err.response?.status);
+        console.error("Email/Fetch error data:", err.response?.data);
+        console.error("Email/Fetch error message:", err.message);
       }
     }
 
-    res.status(201).json(notification);
+    res.status(201).json({
+      ...notification.toObject(),
+      emailSent,
+      emailError,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
