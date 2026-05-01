@@ -35,14 +35,32 @@ $images = @(
   @{ Name = "healthcare/doctor-service:local"; Context = "services/doctor-service" },
   @{ Name = "healthcare/appointment-service:local"; Context = $appointmentContext },
   @{ Name = "healthcare/payment-service:local"; Context = $paymentContext },
-  @{ Name = "healthcare/video-service:local"; Context = "services/video-service" }
+  @{ Name = "healthcare/video-service:local"; Context = "services/video-service" },
+  @{ Name = "healthcare/ai-symptom-service:local"; Context = "services/ai-symptom-service" },
+  @{ Name = "healthcare/notification-service:local"; Context = "services/notification-service" },
+  @{ Name = "healthcare/client:local"; Context = "client"; BuildArgs = @(
+    "REACT_APP_API_BASE_URL=http://localhost:30000",
+    "REACT_APP_NOTIFICATION_URL=http://localhost:30005"
+  ) }
 )
 
 Write-Host "Building local Kubernetes images..." -ForegroundColor Cyan
 
 foreach ($img in $images) {
   Write-Host "-> Building $($img.Name) from $($img.Context)" -ForegroundColor Yellow
-  docker build -t $img.Name $img.Context
+  $buildArgs = @()
+  if ($img.ContainsKey('BuildArgs')) {
+    foreach ($buildArg in $img.BuildArgs) {
+      $buildArgs += @('--build-arg', $buildArg)
+    }
+  }
+
+  if ($buildArgs.Count -gt 0) {
+    & docker build @buildArgs -t $img.Name $img.Context
+  } else {
+    & docker build -t $img.Name $img.Context
+  }
+
   if ($LASTEXITCODE -ne 0) {
     throw "Build failed for $($img.Name)"
   }

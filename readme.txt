@@ -34,16 +34,15 @@ Alternative using helper script
 
 Kubernetes Deployment (Optional)
 --------------------------------
-1. Build local images:
-   .\k8s\build-local-images.ps1
-2. Apply manifests:
-   kubectl apply -f .\k8s\healthcare-platform.yaml
+1. Start the stack:
+   .\run-healthcare.ps1 -Mode k8s -Action up
+2. This will build images, sync the database links from `.env`, and apply the manifests.
 3. Check resources:
    kubectl get all -n healthcare
 4. Gateway health (NodePort):
    http://localhost:30000/health
-5. Tear down:
-   kubectl delete -f .\k8s\healthcare-platform.yaml
+5. Stop the stack:
+   .\run-healthcare.ps1 -Mode k8s -Action down
 
 Notes
 -----

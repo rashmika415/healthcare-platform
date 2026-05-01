@@ -14,6 +14,19 @@ function Invoke-LocalImageBuild {
   & "$root\k8s\build-local-images.ps1"
 }
 
+function Invoke-DatabaseSecretSync {
+  $envFile = Join-Path $root '.env'
+  if (-not (Test-Path $envFile)) {
+    throw ".env file not found at $envFile"
+  }
+
+  kubectl create secret generic healthcare-db-uris `
+    --namespace healthcare `
+    --from-env-file=$envFile `
+    --dry-run=client `
+    -o yaml | kubectl apply -f -
+}
+
 switch ($Mode) {
   "compose" {
     switch ($Action) {
@@ -26,6 +39,7 @@ switch ($Mode) {
     switch ($Action) {
       "up" {
         Invoke-LocalImageBuild
+        Invoke-DatabaseSecretSync
         kubectl apply -f "$root\k8s\healthcare-platform.yaml"
         kubectl get pods -n healthcare
       }
